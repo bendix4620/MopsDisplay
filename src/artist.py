@@ -1,7 +1,6 @@
 """Artists that dynamically position canvas items"""
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from itertools import cycle
 from pathlib import Path
 from tkinter import Canvas
@@ -56,118 +55,176 @@ def _load_icon(path: Path) -> Image.Image:
     image.thumbnail((WIDTH_ICON, FONT_TEXT[1]*16//12))
     return ImageTk.PhotoImage(image)
 
+corner2center_x = {
+    "nw": lambda x, w: x+w/2,
+    "ne": lambda x, w: x-w/2,
+    "se": lambda x, w: x-w/2,
+    "sw": lambda x, w: x+w/2,
+    "n":  lambda x, w: x,
+    "e":  lambda x, w: x-w/2,
+    "s":  lambda x, w: x,
+    "w":  lambda x, w: x+w/2,
+    "center": lambda x, w: x,
+}
+
+center2corner_x = {
+    "nw": lambda x, w: x-w/2,
+    "ne": lambda x, w: x+w/2,
+    "se": lambda x, w: x+w/2,
+    "sw": lambda x, w: x-w/2,
+    "n":  lambda x, w: x,
+    "e":  lambda x, w: x+w/2,
+    "s":  lambda x, w: x,
+    "w":  lambda x, w: x-w/2,
+    "center": lambda x, w: x
+}
+
+corner2center_y = {
+    "nw": lambda y, h: y+h/2,
+    "ne": lambda y, h: y+h/2,
+    "se": lambda y, h: y-h/2,
+    "sw": lambda y, h: y-h/2,
+    "n":  lambda y, h: y-h/2,
+    "e":  lambda y, h: y,
+    "s":  lambda y, h: y+h/2,
+    "w":  lambda y, h: y,
+    "center": lambda y, h: y
+}
+
+center2corner_y = {
+    "nw": lambda y, h: y-h/2,
+    "ne": lambda y, h: y-h/2,
+    "se": lambda y, h: y+h/2,
+    "sw": lambda y, h: y+h/2,
+    "n":  lambda y, h: y+h/2,
+    "e":  lambda y, h: y,
+    "s":  lambda y, h: y-h/2,
+    "w":  lambda y, h: y,
+    "center": lambda y, h: y
+}
+
+class Cell:
+    """Cell of a grid"""
 
 
-class GridCanvas(Canvas):
-    """Canvas that evenly spaces artists"""
+    def __init__(self, x, y, width, height, anchor="center"):
+        self.anchor = anchor
 
-    def __init__(self, master):
-        super().__init__(master, bg=COLOR_BG, highlightthickness=0)
-        self.bind("<Configure>", self.on_resize)
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
 
-        self.artists = {}
-        self.rows = 0
-        self.cols = 0
+    def _corners_differ(self, corner: str|None) -> bool:
+        if corner is None:
+            return False
+        if corner == self.anchor:
+            return False
+        return True
 
-    def on_resize(self, event):
-        """Move all contents on the canvas"""
-        rpad = event.height / (2*self.rows)
-        cpad = event.width / (2*self.cols)
-        for (row, col), artist in self.artists.items():
-            artist.x = cpad*(1 + 2*col)
-            artist.y = rpad*(1 + 2*row)
+    def get_x(self, corner: str|None) -> int:
+        """Get x coordinate of a corner"""
+        x = self.x
+        if self._corners_differ(corner):
+            x = corner2center_x[self.anchor](x, self.width)
+            x = center2corner_x[corner](x, self.width)
+        return x
 
-    def get(self, row: int, col: int) -> None | Artist:
-        """Get artist on position (row, col)"""
-        return self.artists.get((row, col), None)
-
-    def set(self, row: int, col:int, value: Artist):
-        """Insert artist on position (row, col)"""
-        self.rows = max(row+1, self.rows)
-        self.cols = max(col+1, self.cols)
-        self.artists[(row, col)] = value
-
-    def pop(self, row: int, col:int) -> None | Artist:
-        """Pop artist on position (row, col)
-        Warning: Does NOT reduce number of rows and columns automatically
-        """
-        return self.artists.pop((row, col))
-
-    def update(self):
-        """Update items of all artists"""
-        for artist in self.artists.values():
-            artist.update()
-
-
-class Artist(ABC):
-    """Artist base class"""
-
-    def __init__(self, canvas: GridCanvas, x: int, y: int):
-        self.canvas = canvas
-        self._x = x
-        self._y = y
-
-    @abstractmethod
-    def on_resize(self):
-        """Actions to be done on resize/move"""
-
-    @property
-    @abstractmethod
-    def width(self) -> int:
-        """Artist width"""
-
-    @property
-    @abstractmethod
-    def height(self) -> int:
-        """Artist height"""
+    def set_x(self, x: int, corner: str|None):
+        """Move x coordinate of a corner to the given value"""
+        old_x = self.get_x(corner=corner)
+        self.x += x - old_x
 
     @property
     def x(self) -> int:
-        """Center coordinate x"""
+        """Anchor coordinate x"""
         return self._x
 
     @x.setter
-    def x(self, val: int):
-        self._x = val
-        self.on_resize()
+    def x(self, x: int):
+        self._x = x
+
+    def get_y(self, corner: str|None) -> int:
+        """Get y coordinate of a corner"""
+        y = self.y
+        if self._corners_differ(corner):
+            y = corner2center_y[self.anchor](y, self.width)
+            y = center2corner_y[corner](y, self.width)
+        return y
+
+    def set_y(self, y: int, corner: str|None):
+        """Move y coordinate of a corner to the given value"""
+        old_y = self.get_y(corner=corner)
+        self.y += y - old_y
 
     @property
     def y(self) -> int:
-        """Center coordinate y"""
+        """Anchor coordinate y"""
         return self._y
 
     @y.setter
-    def y(self, val: int):
-        self._y = val
-        self.on_resize()
-
-    @property
-    def x_nw(self) -> int:
-        """Anchor coordinate x (nw)"""
-        return self.x - self.width//2
-
-    @x_nw.setter
-    def x_nw(self, val: int):
-        self.x = val + self.width//2
-
-    @property
-    def y_nw(self) -> int:
-        """Anchor coordinate y (nw)"""
-        return self.y - self.height//2
-
-    @y_nw.setter
-    def y_nw(self, val: int):
-        self.y = val + self.height//2
-
-    @abstractmethod
-    def update(self):
-        """Update artist items"""
+    def y(self, y: int):
+        self._y = y
 
 
-class StationArtist(Artist):
+def normal(weights: list[float]) -> list[float]:
+    """Iterate over normalized weights"""
+    N = sum(weights)
+    return [w/N for w in weights]
+
+class Grid(Cell):
+    """Canvas that evenly spaces artists"""
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 row_weights: list[float]=None, col_weights: list[float]=None,
+                 anchor="center"):
+        super().__init__(x, y, width, height, anchor=anchor)
+
+        self._cw = col_weights
+        if self._cw is None:
+            self._cw = []
+
+        self._rw = row_weights
+        if self._rw is None:
+            self._rw = []
+
+    def append_row(self, weight: float):
+        """Append a row with weight"""
+        self._rw.append(weight)
+
+    def pop_row(self) -> float:
+        """Pop rows"""
+        return self._rw.pop()
+
+    def append_col(self, weight: float):
+        """Append a column with weights"""
+        self._cw.append(weight)
+
+    def pop_col(self) -> float:
+        """Pop columns"""
+        return self._cw.pop()
+
+    def get_cell(self, row: int, col: int, anchor="center") -> Cell:
+        """Get grid cell at (row, col)"""
+        cweights = normal(self._cw)
+        rweights = normal(self._cw)
+
+        width = cweights[col]*self.width
+        height = rweights[row]*self.height
+        xnw = self.get_x(corner="nw") + cweights[:col]*self.width
+        ynw = self.get_y(corner="nw") + rweights[:row]*self.height
+
+        cell = Cell(0, 0, width, height, anchor=anchor)
+        cell.set_x(xnw, corner="nw")
+        cell.set_y(ynw, corner="nw")
+        return cell
+
+
+
+class StationArtist(Grid):
     """Display station information"""
 
-    def __init__(self, canvas: GridCanvas, station: Station, direction: int,
+    def __init__(self, canvas: Canvas, station: Station, direction: int,
                  show_title: bool=False, icons: dict[str, ImageTk.PhotoImage]=None):
         super().__init__(canvas, 0, 0)
 
