@@ -1,0 +1,91 @@
+events {
+    /*
+    event {
+        date "Any time, really"
+        desc "event description"
+    } 
+    */
+    event {
+        date "26.10."
+        desc "Hörsaalkino: Wall-E"
+    }
+    event {
+        date "31.10."
+        desc "Hörsaalkino: Evil Dead Rise"
+    }
+    event {
+        date "02.11."
+        desc "Hörsaalkino: Sunshine"
+    }
+    event {
+        date "16.11."
+        desc "Doppelkopfturnier"
+    }
+}
+
+
+posters {
+    /*
+    poster {
+        img (posterpath)"file path relative to ./posters"
+    }
+    */
+    poster {
+        img (posterpath)"awarenessDE.png"
+    }
+    poster {
+        img (posterpath)"ringbahn0.jpg"
+    }
+}
+
+
+stations {
+    station {
+        name "S Adlershof"
+        station_id "900193002"
+        directions "900193001" "900186001"
+        fetch_suburban true /* sbahn */
+        fetch_subway false
+        fetch_tram false
+        fetch_bus false
+        fetch_ferry false
+        fetch_express false /* BER Express, FEX */
+        fetch_regional false
+        min_time 8
+        max_time 42
+        min_time_needed 11
+        max_departures (u8)7
+    }
+    station {
+        name "Karl-Ziegler-Str"
+        station_id "900194016"
+        directions "900194537" "900194501"
+        fetch_suburban false /* sbahn */
+        fetch_subway false
+        fetch_tram true
+        fetch_bus true
+        fetch_ferry false
+        fetch_express false /* BER Express, FEX */
+        fetch_regional false
+        min_time 3
+        max_time 28
+        min_time_needed 5
+        max_departures (u8)5
+    }
+    station {
+        name "Magnusstr."
+        station_id "900194501"
+        directions "900194016" "900194504"
+        fetch_suburban false /* sbahn */
+        fetch_subway false
+        fetch_tram true
+        fetch_bus true
+        fetch_ferry false
+        fetch_express false /* BER Express, FEX */
+        fetch_regional false
+        min_time 3
+        max_time 24
+        min_time_needed 5
+        max_departures (u8)5
+    }
+}
