@@ -205,17 +205,23 @@ def normal(weights: list[float]) -> list[float]:
 
 class Grid(Cell):
     """Grid that evenly spaces cells
+
     padding is given in absolute units (pixels)
     rows (height) is given in absolute units (pixels)
     columns (width) is given in relative units (weights)
     """
 
-    def __init__(self, x, y,
+    def __init__(self, 
+            x: int=0, 
+            y: int=0, 
+            width: int=0,
+            height: int=0,
             pad_col: int=0,
+            anchor: str=None,
             row_sizes: list[float]=None,
             col_weights: list[float]=None,
     ):
-        super().__init__(cell.x, cell.y, cell.width, cell.height, anchor=cell.anchor)
+        super().__init__(x, y, width, height, anchor=anchor)
 
         self.pad_col = pad_col
 
@@ -224,7 +230,7 @@ class Grid(Cell):
         self._cw = col_weights
 
         if row_sizes is None:
-            row_sizes = [1]
+            row_sizes = [0]
         self._rs = row_sizes
 
     @property
@@ -255,16 +261,15 @@ class Grid(Cell):
 
     def get_cell(self, row: int, col: int, row_span: int=1, col_span: int=1, anchor="center") -> Cell:
         """Get grid cell at (row, col)"""
-        # normalized weights
+        # x direction
         cweights = normal(self._cw)
-        rweights = normal(self._cw)
-
-        # width(height) of cells in span + width(height) of padding between cells
         width  = sum(cweights[col:col+col_span])*self.free_width + (col_span-1)*self.pad_col
-        height = sum(rweights[row:row+row_span])*self.free_height + (row_span-1)*self.pad_row
+        xnw = self.get_x(corner="nw") + cweights[:col]*self.width + (col+1)*self.pad_col
+
+        # y direction
+        height = self._rs[row]
 
         # positions from the nw corner
-        xnw = self.get_x(corner="nw") + cweights[:col]*self.width + (col+1)*self.pad_col
         ynw = self.get_y(corner="nw") + rweights[:row]*self.height + (row+1)*self.pad_row
 
         # create cell
