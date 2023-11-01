@@ -47,42 +47,50 @@ def time_left(timestr: str) -> int:
     """Parse string and calculate remaining time in minutes"""
     dep = DateParser.parse(timestr)
     time = dep - datetime.now(dep.tzinfo)
-    return int(time.total_seconds() / 60)
+    return time.total_seconds() / 60
 
-def get_url(station: Station, direction: int) -> str:
+def get_url(station: Station, direction: str) -> str:
     """Constructs the URL for the API request"""
-    return f"https://v6.bvg.transport.rest/stops/{station.station_id}/departures?direction={station.directions[direction]}&results=20&suburban={station.fetch_suburban}&subway={station.fetch_subway}&tram={station.fetch_tram}&bus={station.fetch_bus}&ferry={station.fetch_ferry}&express={station.fetch_express}&regional={station.fetch_regional}&when=in+{station.min_time}+minutes&duration={station.max_time-station.min_time}"  # pylint: disable=line-too-long
+    return f"https://v6.bvg.transport.rest/stops/{station.station_id}/departures?direction={direction}&results=20&suburban={station.fetch_suburban}&subway={station.fetch_subway}&tram={station.fetch_tram}&bus={station.fetch_bus}&ferry={station.fetch_ferry}&express={station.fetch_express}&regional={station.fetch_regional}&when=in+{station.min_time}+minutes&duration={station.max_time-station.min_time}"  # pylint: disable=line-too-long
 
-def fetch_departures(station: Station, direction: int) -> list[Departure]:
+def fetch_departures(station: Station, direction: str) -> list[Departure]:
     """Fetch departures in a given direction from BVG API
 
     TODO: always fetch night service lines (even if station.bus == False)
     """
-    departures = []
-    trips = []
+
+    # fetch data from API
     try:
         response = session.get(get_url(station, direction), timeout=30_000).json()
     except requests.exceptions.JSONDecodeError:
         response = {"departures": []}
 
+    departures = []
+    trips = []
+
     def create_departure(data: dict):
         """Departure factory"""
         time = time_left(data["when"])
-        dept = Departure(
+        departure = Departure(
+            id=data["tripID"],
             line=data["line"]["id"],
             dest=shorten_dest(data["direction"]),
             time=time,
             delay=data["delay"],
             product=data["line"]["product"],
             reachable=time > station.min_time_needed)
-        return dept
+        return departure
 
     for data in response["departures"]:
+        # check if departure is listed double in response
         if data["tripId"] in trips:
             continue
-        with suppress(Exception):
-            departures.append(create_departure(data))
-            trips.append(data["tripId"])
+
+        # with suppress(Exception):
+        departures.append(create_departure(data))
+        trips.append(data["tripId"])
+
+        # dont create more departures than necessary
         if len(departures) >= station.max_departures:
             break
     return departures
@@ -90,9 +98,10 @@ def fetch_departures(station: Station, direction: int) -> list[Departure]:
 @dataclass
 class Departure:
     """Departure dataclass"""
+    id: str
     line: str
     dest: str
-    time: int
+    time: float # minutes remaining
     delay: float
     product: str # bus, tram, suburban, express
     reachable: bool

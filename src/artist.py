@@ -1,44 +1,18 @@
-"""Artists that dynamically position canvas items"""
-
 from __future__ import annotations
+from contextlib import suppress
 from itertools import cycle
+from math import floor
 from pathlib import Path
 from tkinter import Canvas
-from PIL import Image, ImageTk
+from tkinter.font import Font
+from typing import Self
+from PIL import Image, ImageTk, ImageFont
 
 from .config import Station, Event, Poster
 from .departure import Departure, fetch_departures
+from .grid import Cell, Grid
 
-
-
-FONT_TITLE = ("Helvetica", 28, "bold") # font of titles
-FONT_TEXT = ("Helvetica", 17, "bold") # font of text
-
-# heights include padding on the bottom
-# widths include padding to the right
-
-# (2 = 16/12 * 3/2 = px/pt + 50% padding)
-HEIGHT_TITLE = FONT_TITLE[1] * 2 # height of titles
-HEIGHT_TEXT = FONT_TEXT[1] * 2 # height of text
-
-HEIGHT_POSTER = 500 # maximum height of poster
-WIDTH_POSTER = 500 # maximum width of poster
-
-WIDTH_DATE = 80 # width of event date
-WIDTH_EVENT = 300 # width of event description text
-
-WIDTH_ICON = 50 # width of departure line icon
-WIDTH_DEST = 200 # width of departure destination
-WIDTH_TIME = 30 # width of departure time
-
-COLOR_BG = "#202020" # background color
-COLOR_TEXT = "#ffffff" # text color
-COLOR_TEXT_NOTIME = "#d03030" # text color if time is too short
-COLOR_TEXT_ERROR = "#807070" # text color if nothing can be displayed
-
-# TODO: use a cleaner alternative
-_ERROR_DEPARTURE = Departure(line="empty", dest="no data", time=0, delay=0, product="error", reachable=False) # pylint: disable=line-too-long
-
+ICON_WIDTH = ICON_HEIGHT = 25
 
 def load_icons() -> dict[str, ImageTk.PhotoImage]:
     """Load tkinter images. 
@@ -52,360 +26,228 @@ def load_icons() -> dict[str, ImageTk.PhotoImage]:
 
 def _load_icon(path: Path) -> Image.Image:
     image = Image.open(path)
-    image.thumbnail((WIDTH_ICON, FONT_TEXT[1]*16//12))
+    image.thumbnail((ICON_WIDTH, ICON_HEIGHT))
     return ImageTk.PhotoImage(image)
 
-corner2center_x = {
-    "nw": lambda x, w: x+w/2,
-    "ne": lambda x, w: x-w/2,
-    "se": lambda x, w: x-w/2,
-    "sw": lambda x, w: x+w/2,
-    "n":  lambda x, w: x,
-    "e":  lambda x, w: x-w/2,
-    "s":  lambda x, w: x,
-    "w":  lambda x, w: x+w/2,
-    "center": lambda x, w: x,
-}
-
-center2corner_x = {
-    "nw": lambda x, w: x-w/2,
-    "ne": lambda x, w: x+w/2,
-    "se": lambda x, w: x+w/2,
-    "sw": lambda x, w: x-w/2,
-    "n":  lambda x, w: x,
-    "e":  lambda x, w: x+w/2,
-    "s":  lambda x, w: x,
-    "w":  lambda x, w: x-w/2,
-    "center": lambda x, w: x
-}
-
-corner2center_y = {
-    "nw": lambda y, h: y+h/2,
-    "ne": lambda y, h: y+h/2,
-    "se": lambda y, h: y-h/2,
-    "sw": lambda y, h: y-h/2,
-    "n":  lambda y, h: y-h/2,
-    "e":  lambda y, h: y,
-    "s":  lambda y, h: y+h/2,
-    "w":  lambda y, h: y,
-    "center": lambda y, h: y
-}
-
-center2corner_y = {
-    "nw": lambda y, h: y-h/2,
-    "ne": lambda y, h: y-h/2,
-    "se": lambda y, h: y+h/2,
-    "sw": lambda y, h: y+h/2,
-    "n":  lambda y, h: y+h/2,
-    "e":  lambda y, h: y,
-    "s":  lambda y, h: y-h/2,
-    "w":  lambda y, h: y,
-    "center": lambda y, h: y
-}
-
-class Cell:
-    """Cell of a grid"""
 
 
-    def __init__(self, x, y, width, height, anchor="center"):
-        self.anchor = anchor
+class DepartureArtist(Grid):
+    WIDTHS       = [2, 10, 1] # icon, destination, time width weights
+    FONT_DEFUALT = ("Helvetica", 14, "bold")
+    COLOR_TXT    = "#ffffff"
+    COLOR_NOTIME = "#d22222"
+    COLOR_ERROR  = "#a0a0a0"
 
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
+    def __init__(
+            self,
+            cell: Cell,
+            canvas: Canvas, 
+            icons: dict[str, ImageTk.PhotoImage]=None, 
+            font: Font=None
+    ):
+        super().__init__(cell, col_weights=self.WIDTHS)
 
-    def _corners_differ(self, corner: str|None) -> bool:
-        if corner is None:
-            return False
-        if corner == self.anchor:
-            return False
-        return True
-
-    def get_x(self, corner: str|None) -> int:
-        """Get x coordinate of a corner"""
-        x = self.x
-        if self._corners_differ(corner):
-            x = corner2center_x[self.anchor](x, self.width)
-            x = center2corner_x[corner](x, self.width)
-        return x
-
-    def set_x(self, x: int, corner: str|None):
-        """Move x coordinate of a corner to the given value"""
-        old_x = self.get_x(corner=corner)
-        self.x += x - old_x
-
-    @property
-    def x(self) -> int:
-        """Anchor coordinate x"""
-        return self._x
-
-    @x.setter
-    def x(self, x: int):
-        self._x = x
-
-    def get_y(self, corner: str|None) -> int:
-        """Get y coordinate of a corner"""
-        y = self.y
-        if self._corners_differ(corner):
-            y = corner2center_y[self.anchor](y, self.width)
-            y = center2corner_y[corner](y, self.width)
-        return y
-
-    def set_y(self, y: int, corner: str|None):
-        """Move y coordinate of a corner to the given value"""
-        old_y = self.get_y(corner=corner)
-        self.y += y - old_y
-
-    @property
-    def y(self) -> int:
-        """Anchor coordinate y"""
-        return self._y
-
-    @y.setter
-    def y(self, y: int):
-        self._y = y
-
-
-def normal(weights: list[float]) -> list[float]:
-    """Iterate over normalized weights"""
-    N = sum(weights)
-    return [w/N for w in weights]
-
-class Grid(Cell):
-    """Canvas that evenly spaces artists"""
-
-    def __init__(self, x: int, y: int, width: int, height: int,
-                 row_weights: list[float]=None, col_weights: list[float]=None,
-                 anchor="center"):
-        super().__init__(x, y, width, height, anchor=anchor)
-
-        self._cw = col_weights
-        if self._cw is None:
-            self._cw = []
-
-        self._rw = row_weights
-        if self._rw is None:
-            self._rw = []
-
-    def append_row(self, weight: float):
-        """Append a row with weight"""
-        self._rw.append(weight)
-
-    def pop_row(self) -> float:
-        """Pop rows"""
-        return self._rw.pop()
-
-    def append_col(self, weight: float):
-        """Append a column with weights"""
-        self._cw.append(weight)
-
-    def pop_col(self) -> float:
-        """Pop columns"""
-        return self._cw.pop()
-
-    def get_cell(self, row: int, col: int, anchor="center") -> Cell:
-        """Get grid cell at (row, col)"""
-        cweights = normal(self._cw)
-        rweights = normal(self._cw)
-
-        width = cweights[col]*self.width
-        height = rweights[row]*self.height
-        xnw = self.get_x(corner="nw") + cweights[:col]*self.width
-        ynw = self.get_y(corner="nw") + rweights[:row]*self.height
-
-        cell = Cell(0, 0, width, height, anchor=anchor)
-        cell.set_x(xnw, corner="nw")
-        cell.set_y(ynw, corner="nw")
-        return cell
-
-
-
-class StationArtist(Grid):
-    """Display station information"""
-
-    def __init__(self, canvas: Canvas, station: Station, direction: int,
-                 show_title: bool=False, icons: dict[str, ImageTk.PhotoImage]=None):
-        super().__init__(canvas, 0, 0)
-
-        self.station = station
-        self.direction = direction # also the column
-        self.show_title = show_title
+        self.canvas = canvas
         self.icons = icons
         if self.icons is None:
             self.icons = {"default": None}
+        self.font = font
+        if self.font is None:
+            self.font = Font(font=self.FONT_DEFAULT)
+
+        self.last_tripId = None
+        self.dest_space = 0
 
         # create items
-        self._create_title()
-        self.id_departures: list[tuple[int, int, int]] = []
-        for _ in range(station.max_departures):
-            self._create_departure()
-        self.on_resize()
+        cell = self.get_cell(0, 0, anchor="center")
+        self.id_icon = self.canvas.create_image(cell.x, cell.y, anchor="center")
 
-    def _create_title(self):
-        text = self.station.name if self.show_title else " "
-        self.id_title = self.canvas.create_text(0, 0, text=text,
-            font=FONT_TITLE, fill=COLOR_TEXT, anchor="nw")
+        cell = self.get_cell(0, 1, anchor="w")
+        self.dest_space = cell.width
+        self.id_dest = self.canvas.create_text(cell.x, cell.y, anchor="w", font=self.FONT, fill=self.COLOR_TXT)
+        
+        cell = self.get_cell(0, 1, anchor="e")
+        self.id_time = self.canvas.create_text(cell.x, cell.y, anchor="e", font=self.FONT, fill=self.COLOR_TXT)
 
-    def _create_departure(self):
-        id_icon = self.canvas.create_image(0, 0, anchor="nw")
-        # id_icon = self.canvas.create_rectangle(0, 0, 20, 20, fill="#00ff00")
-        id_dest = self.canvas.create_text(0, 0, text="",
-            font=FONT_TEXT, fill=COLOR_TEXT, anchor="nw")
-        id_time = self.canvas.create_text(0, 0, text="",
-            font=FONT_TEXT, fill=COLOR_TEXT, anchor="nw")
+    def update_departure(self, departure: Departure|None):
+        if departure is None:
+            self.last_tripId = None
+            self.canvas.itemconfigure(self.id_icon, image=None)
+            self.canvas.itemconfigure(self.id_dest, text="could not fetch departure", fill=self.COLOR_ERROR)
+            self.canvas.itemconfigure(self.id_time, text=" ")
+            return
 
-        self.id_departures.append((id_icon, id_dest, id_time))
+        if departure.id != self.last_tripId:
+            self.last_tripId = departure.id
+            self.canvas.itemconfigure(self.id_icon, image=self._display_icon(departure))
+            self.canvas.itemconfigure(self.id_dest, text=self._display_dest(departure), fill=self.COLOR_TXT)
+        self.canvas.itemconfigure(self.id_time, text=self._display_time(departure), fill=self._display_color(departure))
 
-    def _place_departure(self, i: int):
-        id_icon, id_dest, id_time = self.id_departures[i]
-        y_nw = self.y_nw + HEIGHT_TITLE + HEIGHT_TEXT*i
-        x_nw = self.x_nw
-        self.canvas.coords(id_icon, x_nw, y_nw)
-        x_nw += WIDTH_ICON
-        self.canvas.coords(id_dest, x_nw, y_nw)
-        x_nw += WIDTH_DEST
-        self.canvas.coords(id_time, x_nw, y_nw)
-
-    def on_resize(self):
-        self.canvas.coords(self.id_title, self.x_nw, self.y_nw)
-        for i in range(len(self.id_departures)):
-            self._place_departure(i)
-
-    @property
-    def width(self) -> int:
-        return WIDTH_ICON + WIDTH_DEST + WIDTH_TIME
-
-    @property
-    def height(self) -> int:
-        return HEIGHT_TITLE + HEIGHT_TEXT * self.station.max_departures
-
-    def update(self):
-        """Update departure informations, call regularily"""
-        data_departures = fetch_departures(self.station, self.direction)
-        for i, departure in enumerate(data_departures):
-            if i >= len(data_departures):
-                self._update_departure(i, _ERROR_DEPARTURE)
-            self._update_departure(i, departure)
-
-    def _update_departure(self, i: int, departure: Departure):
-        id_icon, id_dest, id_time = self.id_departures[i]
-        self.canvas.itemconfigure(id_icon, image=self._get_icon(departure))
-        self.canvas.itemconfigure(id_dest, text=departure.dest)
-        self.canvas.itemconfigure(id_time, text=self._get_time(departure),
-                                           fill=self._get_color(departure))
-        # log entries that are too large
-        bbox = self.canvas.bbox(id_dest)
-        width = bbox[2]-bbox[0]
-        if width > WIDTH_DEST:
-            print(f"Destination too large ({width: <3} > {WIDTH_DEST: <3}): {departure.dest}")
-
-    def _get_icon(self, departure: Departure) -> ImageTk.PhotoImage:
-        # TODO: use bus image if SEV?
+    def _display_icon(self, departure: Departure) -> ImageTk.PhotoImage:
         icon = self.icons.get(departure.line, None)
         if icon is None:
             icon = self.icons.get(departure.product, None)
             print(f"Warning: Fallback images used for {departure.line}")
         if icon is None:
-            icon = self.icons["default"]
+            icon = self.icons.get("default")
             print(f"Warning: Default images used for {departure.line}")
         return icon
+    
+    def _display_dest(self, departure: Departure) -> str:
+        width = self.font.measure(departure.dest)
+        idx = -1
 
-    def _get_color(self, departure: Departure):
-        if departure.product == "error":
-            return COLOR_TEXT_ERROR
-        if not departure.reachable:
-            return COLOR_TEXT_NOTIME
-        return COLOR_TEXT
+        # only return text that fits in available space
+        if width >= self.dest_space:
+            available = self.dest_space
+            occupied = self.font.measure("...")
+            for i, char in enumerate(departure.dest):
+                if occupied >= available:
+                    idx = i
+                    break
+                occupied += self.font.measure(char)
+        return departure.dest[:idx] + "..."
 
-    def _get_time(self, departure: Departure) -> str:
-        if departure.product == "error":
-            return ""
-        return str(departure.time)
+    def _display_time(self, departure: Departure) -> str:
+        return str(floor(departure.time))
+
+    def _display_color(self, departure: Departure) -> str:
+        return self.COLOR_TXT if departure.reachable else self.COLOR_NOTIME
 
 
-class EventArtist(Artist):
+class DirectionArtist(Grid):
+    """Display station information for a direction"""
+
+    WEIGHT_TITLE = 3
+    WEIGHT_TXT   = 1
+    FONT_DEFAULT = ("Helvetica", 24, "bold")
+    COLOR_TXT    = "#ffffff"
+
+    def __init__(
+            self, 
+            cell: Cell,
+            canvas: Canvas,
+            station: Station,
+            direction: str,
+            show_title: bool=True,
+            font_title: Font=None, 
+            font_departure: Font=None,
+            icons: dict[str, ImageTk.PhotoImage]=None, 
+            *args, **kwargs
+    ):
+        row_weights = [self.WEIGHT_TITLE]+[self.WEIGHT_TXT]*station.max_departures
+        super().__init__(cell, row_weights=row_weights)
+
+        self.canvas = canvas
+
+        if direction not in station.directions:
+            raise ValueError(f"Direction {direction} is not available on station {station.name}")
+        self.station = station
+        self.direction = direction
+
+        self.show_title = show_title
+        if font_title is None:
+            font_title = Font(font=self.FONT_DEFAULT)
+        self.font = font_title
+
+        # create title
+        if self.show_title:
+            cell = self.get_cell(0, 0, col_span=len(self.station.directions), anchor="w")
+            self.canvas.create_text(cell.x, cell.y, text=station.name, font=self.font, fill=self.COLOR_TXT, anchor="w")
+        
+        # create departures
+        self.departure_artists: list[DepartureArtist] = []
+        for row in range(station.max_departures):
+            cell = self.get_cell(1+row, 0)
+            artist = DepartureArtist(self.canvas, icons=icons, font=font_departure, cell.x, cell.y, )
+            self.departure_artists.append(artist)
+        self.resize()
+
+    def _on_resize(self):
+        # place station title
+        if self.show_title:
+            self.canvas.coords(self.id_title, cell.x, cell.y)
+
+        # place departures
+        for row in range(self.station.max_departures):
+            cell = self.get_cell(1+row) # +1 row for title
+            artist = self.departure_artists[row]
+            artist.bind_to_cell(cell)
+        return super()._on_resize()
+
+    def update(self):
+        """Update departure informations, call regularily"""
+        departures = fetch_departures(self.station, self.direction)
+        for row in range(self.station.max_departures):
+            departure = None
+            with suppress(IndexError):
+                departure = departures[row]
+            artist = self.departure_artists[row]
+            artist.update_departure(departure)
+
+
+class EventArtist(Grid):
     """Display events"""
+    WEIGHTS_COLS  = [1, 10] # date, description width weight
+    WEIGHT_EVENT  = 1
+    WEIGHT_POSTER = 10
+    FONT_DEFUALT  = ("Helvetica", 14, "bold")
+    COLOR_TXT     = "#ffffff"
 
-    def __init__(self, canvas: GridCanvas, events: list[Event]):
-        super().__init__(canvas, 0, 0)
+    def __init__(self,
+            cell: Cell,
+            canvas: Canvas,
+            events: list[Event],
+            posters: list[Poster],
+            font: Font=None,
+    ):
+        row_weights = [self.WEIGHT_EVENT]*len(events)+[self.WEIGHT_POSTER]
+        super().__init__(cell, row_weights=row_weights, col_weights=self.WEIGHTS_COLS)
 
+        self.canvas = canvas
+        if font is None:
+            font = Font(font=self.FONT_DEFAULT)
+        self.font = font
+        font.metrics
+
+        # events
         self.id_events: list[tuple[int, int]] = []
-        for event in events:
+        for i, event in enumerate(events):
             self._create_event(event)
-        self.on_resize()
+
+        # posters
+        self.posters = posters
+        self.images = cycle([])
+        self.id_poster = self.canvas.create_image(0, 0, anchor="center")
+        self.resize()
 
     def _create_event(self, event: Event):
         id_date = self.canvas.create_text(0, 0, text=event.date,
-            font=FONT_TEXT, fill=COLOR_TEXT, anchor="nw")
+            font=self.font, fill=self.COLOR_TXT, anchor="e")
         id_desc = self.canvas.create_text(0, 0, text=event.desc,
-            font=FONT_TEXT, fill=COLOR_TEXT, anchor="nw")
+            font=self.font, fill=self.COLOR_TXT, anchor="w")
         self.id_events.append((id_date, id_desc))
 
-    def _place_event(self, i: int):
-        id_date, id_desc = self.id_events[i]
-        y = self.y_nw + HEIGHT_TEXT*i
-        x = self.x_nw
-        self.canvas.coords(id_date, x, y)
-        x += WIDTH_DATE
-        self.canvas.coords(id_desc, x, y)
-
-    def on_resize(self):
-        for i in range(len(self.id_events)):
-            self._place_event(i)
-
-    @property
-    def width(self) -> int:
-        return WIDTH_DATE + WIDTH_EVENT
-
-    @property
-    def height(self) -> int:
-        return HEIGHT_TEXT * len(self.id_events)
-
-    def update(self):
-        pass
-
-
-class PosterArtist(Artist):
-    """Display and cycle through posters"""
-
-    def __init__(self, canvas: GridCanvas, posters: list[Poster]):
-        super().__init__(canvas, 0, 0)
-
-        self.id_poster = self.canvas.create_image(self.x, self.y, anchor="center")
-        self.posters = cycle([self._load_poster(poster) for poster in posters])
-
-    def _load_poster(self, poster: Poster):
+    def _load_poster(self, poster:Poster, width: int, height: int):
         image = Image.open(poster.img)
-        image.thumbnail((WIDTH_POSTER, HEIGHT_POSTER))
+        image.thumbnail((width, height))
         return ImageTk.PhotoImage(image)
 
-    def on_resize(self):
-        self.canvas.coords(self.id_poster, self.x, self.y)
-
-    @property
-    def width(self) -> int:
-        return self.bbox[2] - self.bbox[0]
-
-    @property
-    def height(self) -> int:
-        return self.bbox[3] - self.bbox[1]
-
-    @property
-    def x_nw(self) -> int:
-        return self.bbox[0]
-
-    @property
-    def y_nw(self) -> int:
-        return self.bbox[1]
-
-    @property
-    def bbox(self) -> tuple[int, int, int, int]:
-        """Artist bounding box"""
-        return self.canvas.bbox(self.id_poster)
+    def _on_resize(self):
+        # events
+        for row, (id_date, id_desc) in enumerate(self.id_events):
+            cell = self.get_cell(row, 0, anchor="e")
+            self.canvas.coords(id_date, cell.x, cell.y)
+            cell = self.get_cell(row, 1, anchor="w")
+            self.canvas.coords(id_desc, cell.x, cell.y)
+        
+        # posters
+        cell = self.get_cell(-1, 0, row_span=2, anchor="center")
+        self.images = cycle([self._load_poster(poster, cell.width, cell.height) 
+                             for poster in self.posters])
+        self.canvas.coords(self.id_poster, cell.x, cell.y)
+        self.update()
 
     def update(self):
         """Cycle to next poster"""
-        p = next(self.posters)
-        print("p", p)
-        self.canvas.itemconfigure(self.id_poster, image=p)
+        self.canvas.itemconfigure(self.id_poster, image=next(self.images))
