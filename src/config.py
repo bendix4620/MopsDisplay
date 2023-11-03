@@ -1,9 +1,9 @@
 """Import data from config.kdl"""
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import kdl
+from .data import Station, Event, Poster
 
 
 
@@ -11,38 +11,6 @@ PATH = Path(__file__).parents[1].resolve() / "data"
 POSTER = PATH / "posters"
 CONFIG = PATH / "config.kdl"
 
-
-
-@dataclass(frozen=True)
-class Event:
-    """Event data"""
-    date: str
-    desc: str
-
-
-@dataclass(frozen=True)
-class Poster:
-    """Poster data"""
-    img: Path
-
-
-@dataclass(frozen=True)
-class Station:
-    """Station data"""
-    name: str
-    station_id: str
-    directions: list[str]
-    fetch_suburban: bool
-    fetch_subway: bool
-    fetch_tram: bool
-    fetch_bus: bool
-    fetch_ferry: bool
-    fetch_express: bool
-    fetch_regional: bool
-    min_time: float
-    max_time: float
-    min_time_needed: float
-    max_departures: int
 
 def kdl2imgpath(string: kdl.String, raw: kdl.ParseFragment) -> Path: # pylint: disable=unused-argument
     """Convert kdl string to an image path"""

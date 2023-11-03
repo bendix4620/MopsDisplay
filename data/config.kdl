@@ -42,50 +42,66 @@ posters {
 stations {
     station {
         name "S Adlershof"
-        station_id "900193002"
-        directions "900193001" "900186001"
-        fetch_suburban true /* sbahn */
-        fetch_subway false
-        fetch_tram false
-        fetch_bus false
-        fetch_ferry false
-        fetch_express false /* BER Express, FEX */
-        fetch_regional false
-        min_time 8
-        max_time 42
-        min_time_needed 11
-        max_departures (u8)7
+        id "900193002"
+        max_departures (u16)7
+
+        // fetch during day time
+        S_day true  // suburban, S-Bahn
+        U_day false // subway U-Bahn
+        T_day false // tram
+        B_day false // bus
+        F_day false // ferry
+        E_day false // express, IC/ICE
+        R_day false // regional, RE/RB
+
+        // fetch during night time
+        S_night true  // suburban, S-Bahn
+        U_night false // subway U-Bahn
+        T_night false // tram
+        B_night true  // bus
+        F_night false // ferry
+        E_night false // express, IC/ICE
+        R_night false // regional, RE/RB
+
+        // time given in HH:MM:SS
+        start_night "23:59:00" // start of night service
+        stop_night  "05:00:00" // stop of night service
+
+        // time given in minutes
+        min_time 8 // min time left for fetched departures
+        max_time 42 // max time left for fetched departures
+        time_needed 11 // time needed to reach station
     }
     station {
-        name "Karl-Ziegler-Str"
-        station_id "900194016"
-        directions "900194537" "900194501"
-        fetch_suburban false /* sbahn */
-        fetch_subway false
-        fetch_tram true
-        fetch_bus true
-        fetch_ferry false
-        fetch_express false /* BER Express, FEX */
-        fetch_regional false
+        name "Karl-Ziegler-Str."
+        id "900194016"
+        max_departures (u16)5
+        
+        T_day true
+        B_day true
+        T_night true
+        B_night true
+        start_night "23:59:00"
+        stop_night  "05:00:00"
+
         min_time 3
         max_time 28
-        min_time_needed 5
-        max_departures (u8)5
+        time_needed 5
     }
     station {
         name "Magnusstr."
-        station_id "900194501"
-        directions "900194016" "900194504"
-        fetch_suburban false /* sbahn */
-        fetch_subway false
-        fetch_tram true
-        fetch_bus true
-        fetch_ferry false
-        fetch_express false /* BER Express, FEX */
-        fetch_regional false
+        id "900194501"
+        max_departures (u16)5
+
+        T_day true
+        B_day true
+        T_night true
+        B_night true
+        start_night "23:59:00"
+        stop_night  "05:00:00"
+
         min_time 3
         max_time 24
-        min_time_needed 5
-        max_departures (u8)5
+        time_needed 5
     }
 }
