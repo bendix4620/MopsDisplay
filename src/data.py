@@ -3,8 +3,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from dateutil import parser as dateparser
+from PIL.ImageTk import PhotoImage
 import requests
 
 
@@ -21,7 +21,7 @@ class Event:
 @dataclass(frozen=True, order=True, kw_only=True)
 class Poster:
     """Poster data"""
-    img: Path
+    img: PhotoImage
 
 
 @dataclass(frozen=True, order=True, kw_only=True)
@@ -29,6 +29,8 @@ class Station:
     """Station data"""
     name: str
     id: str
+    departure_rows: int
+    departure_cols: int
 
     # fetch during day time
     S_day: bool = False # fetch suburban
@@ -56,7 +58,6 @@ class Station:
     max_time: float # max time left for fetched departures
     time_needed: float # time needed to reach station
 
-    max_departures: int
 
     def is_in_night_service(self):
         """Return True if night service is currently active"""
@@ -71,7 +72,7 @@ class Station:
         return (f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
                 f"when=in+{self.min_time}+minutes&"
                 f"duration={self.max_time-self.min_time}&"
-                f"results={self.max_departures}&"
+                f"results={self.departure_rows*self.departure_cols}&"
                 f"suburban={self.S_night if night else self.S_day}&"
                 f"subway={  self.U_night if night else self.U_day}&"
                 f"tram={    self.T_night if night else self.T_day}&"
@@ -96,10 +97,10 @@ class Station:
         """Departure factory"""
         time = time_left(data["when"])
         departure = Departure(
-            id=data["tripID"],
+            id=data["tripId"],
             line=data["line"]["id"],
             direction=data["direction"],
-            time=time,
+            time_left=time,
             delay=data["delay"],
             product=data["line"]["product"],
             reachable=time > self.time_needed)
@@ -108,13 +109,13 @@ class Station:
 
 @dataclass(frozen=True, order=True, kw_only=True)
 class Departure:
-    """Departure dataclass"""
+    """Departure data"""
     id: str
     line: str
     direction: str
-    time: float # minutes remaining
+    time_left: float
     delay: float
-    product: str # bus, tram, suburban, express
+    product: str # suburban, subway, tram, bus, ferry, express, regional
     reachable: bool
 
 

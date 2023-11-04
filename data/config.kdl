@@ -31,10 +31,10 @@ posters {
     }
     */
     poster {
-        img (posterpath)"awarenessDE.png"
+        img (poster)"awarenessDE.png"
     }
     poster {
-        img (posterpath)"ringbahn0.jpg"
+        img (poster)"ringbahn0.jpg"
     }
 }
 
@@ -43,39 +43,41 @@ stations {
     station {
         name "S Adlershof"
         id "900193002"
-        max_departures (u16)7
+        departure_rows (u8)10
+        departure_cols (u8)2
 
-        // fetch during day time
-        S_day true  // suburban, S-Bahn
-        U_day false // subway U-Bahn
-        T_day false // tram
-        B_day false // bus
-        F_day false // ferry
-        E_day false // express, IC/ICE
-        R_day false // regional, RE/RB
+        /* fetch during day time */
+        S_day true  /* suburban, S-Bahn */
+        U_day false /* subway U-Bahn */
+        T_day false /* tram */
+        B_day false /* bus */
+        F_day false /* ferry */
+        E_day false /* express, IC/ICE */
+        R_day false /* regional, RE/RB */
 
-        // fetch during night time
-        S_night true  // suburban, S-Bahn
-        U_night false // subway U-Bahn
-        T_night false // tram
-        B_night true  // bus
-        F_night false // ferry
-        E_night false // express, IC/ICE
-        R_night false // regional, RE/RB
+        /* fetch during night time */
+        S_night true  /* suburban, S-Bahn */
+        U_night false /* subway U-Bahn */
+        T_night false /* tram */
+        B_night true  /* bus */
+        F_night false /* ferry */
+        E_night false /* express, IC/ICE */
+        R_night false /* regional, RE/RB */
 
-        // time given in HH:MM:SS
-        start_night "23:59:00" // start of night service
-        stop_night  "05:00:00" // stop of night service
+        /* time given in HH:MM:SS */
+        start_night "23:59:00" /* start of night service */
+        stop_night  "05:00:00" /* stop of night service */
 
-        // time given in minutes
-        min_time 8 // min time left for fetched departures
-        max_time 42 // max time left for fetched departures
-        time_needed 11 // time needed to reach station
+        /* time given in minutes */
+        min_time 8 /* min time left for fetched departures */
+        max_time 42 /* max time left for fetched departures */
+        time_needed 11 /* min time needed to reach station */
     }
     station {
         name "Karl-Ziegler-Str."
         id "900194016"
-        max_departures (u16)5
+        departure_rows (u8)10
+        departure_cols (u8)2
         
         T_day true
         B_day true
@@ -91,7 +93,8 @@ stations {
     station {
         name "Magnusstr."
         id "900194501"
-        max_departures (u16)5
+        departure_rows (u8)10
+        departure_cols (u8)2
 
         T_day true
         B_day true

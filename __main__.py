@@ -5,70 +5,67 @@ Authored-By: Maris Baier
 Co-Authored-By: Hazel Reimer
 """
 
-from tkinter import Tk
-from typing import Callable
+from collections import namedtuple
+from itertools import zip_longest
+from tkinter import Canvas
+from src import root
+from src.defines import *
+from src.data import Event, Poster, Station, Departure
+from src.config import load_data
+from src.artist import StackArtist, DepartureArtist, TitleArtist, EventArtist, PosterArtist, GridCanvas
 
-from src.artist import GridCanvas, StationArtist, EventArtist, PosterArtist, load_icons
-from src.config import Station, Event, Poster, load_data
+root.geometry("1280x1024")
+# root.attributes("-fullscreen", True)
+root.rowconfigure(0, weight=1)
+root.columnconfigure(0, weight=2)
+root.columnconfigure(1, weight=1)
 
+def create_departures(canvas: GridCanvas, row: int, station: Station) -> list[DepartureArtist]:
+    """Create departures for a station"""
+    artists = []
+    for col in range(station.departure_cols):
+        stacked_artists = [DepartureArtist(canvas, anchor="w") 
+                           for _ in range(station.departure_rows)]
+        stack = StackArtist(0, 0, anchor="w", flush="w", artists=stacked_artists)
 
-POSTER_UPDATE_TIME = 180_000
-STATION_UPDATE_TIME = 5_000
+        artists += stacked_artists
+        canvas.set(row, col, stack)
+    return artists
 
+def update_departures(station: Station, artists: list[DepartureArtist]):
+    """update departures of a station"""
+    for departure, artist in zip_longest(station.fetch_departures(), artists):
+        if artist is None:
+            break
+        artist.update_departure(departure)
 
-class App(Tk):
-    """MopsDisplay application"""
+def update_stations():
+    """periodically update stations"""
+    for station, artists in station_departure_artists:
+        update_departures(station, artists)
+    root.after(STATION_UPDATE_TIME, update_stations)
 
-    def __init__(self):
-        super().__init__()
-
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=2)
-        self.columnconfigure(1, weight=1)
-
-        self.station_canvas = GridCanvas(self)
-        self.station_canvas.grid(row=0, column=0, sticky="NESW")
-        self.event_canvas = GridCanvas(self)
-        self.event_canvas.grid(row=0, column=1, sticky="NESW")
-
-    def update_stations(self, *args, **kwargs): # pylint: disable=unused-argument
-        """Update station canvas. Call periodically"""
-        self.station_canvas.update()
-        self.after(STATION_UPDATE_TIME, self.update_stations) # every 5 seconds
-
-    def update_posters(self, *args, **kwargs): # pylint: disable=unused-argument
-        """Update event canvas. Call periodically"""
-        self.event_canvas.update()
-        self.after(POSTER_UPDATE_TIME, self.update_posters) # every 3 minutes
-
-
-# create app
-app = App()
-app.geometry("1280x1024")
-# app.attributes("-fullscreen", True)
-
-# load data
 stations, events, posters = load_data()
 
-# add stations to canvas
-icons = load_icons()
-for i, station in enumerate(stations):
-    for j in range(len(station.directions)):
-        artist = StationArtist(app.station_canvas, station, j, show_title=j==0, icons=icons)
-        app.station_canvas.set(i, j, artist)
+# create stations
+station_canvas = GridCanvas(root)
+station_canvas.grid(row=0, column=0, sticky="NESW")
 
-# add events to canvas
-event_artist = EventArtist(app.event_canvas, events)
-app.event_canvas.set(1, 0, event_artist)
+station_departure_artists: list[tuple[Station, list[DepartureArtist]]] = []
+row = 0
+for station in stations:
+    print(station.name)
+    title = TitleArtist(station_canvas, station.name, anchor="w")
+    station_canvas.set(row, 0, title)
+    row += 1
+    artists = create_departures(station_canvas, row, station)
+    station_departure_artists.append((station, artists))
+    row += 1
 
-# add posters to canvas
-poster_artist = PosterArtist(app.event_canvas, posters)
-app.event_canvas.set(3, 0, poster_artist)
-# dummy poster
-app.event_canvas.set(5, 0, EventArtist(app.event_canvas, []))
+update_stations()
 
-app.update_stations()
-app.update_posters()
-# app.bind("<Return>", app.update_stations)
-# app.bind("<Return>", app.update_posters)
-app.mainloop()
+
+# create events and posters
+# event_canvas = ColumnCanvas(root)
+
+root.mainloop()

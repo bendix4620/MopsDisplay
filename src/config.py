@@ -2,24 +2,20 @@
 
 from pathlib import Path
 from typing import Any
+from PIL.ImageTk import PhotoImage
 import kdl
+from .defines import *
 from .data import Station, Event, Poster
 
 
-
-PATH = Path(__file__).parents[1].resolve() / "data"
-POSTER = PATH / "posters"
-CONFIG = PATH / "config.kdl"
-
-
-def kdl2imgpath(string: kdl.String, raw: kdl.ParseFragment) -> Path: # pylint: disable=unused-argument
+def kdl2poster(string: kdl.String, raw: kdl.ParseFragment) -> PhotoImage: # pylint: disable=unused-argument
     """Convert kdl string to an image path"""
-    path = POSTER / string.value
+    path = POSTER_PATH / string.value
     path = path.resolve()
 
     if not path.is_file():
         raise ValueError(f"Could not find file {path}")
-    return path
+    return load_image(path, WIDTH_POSTER, HEIGHT_POSTER)
 
 def reduce_node(node: kdl.Node, raw: kdl.ParseFragment) -> kdl.Node: # pylint: disable=unused-argument
     """Move child nodes to node args"""
@@ -50,24 +46,24 @@ class NodeConverter:
         args, kwargs = self.node2args(node)
         return self._cls(*args, **kwargs)
 
-KDL_PARSECONFIG = kdl.ParseConfig(
-    valueConverters={"posterpath": kdl2imgpath},
-    nodeConverters={"station": NodeConverter(Station),
-                    "event":   NodeConverter(Event), 
-                    "poster":  NodeConverter(Poster),
-                    "stations": reduce_node,
-                    "events":   reduce_node,
-                    "posters":  reduce_node})
-
 def load_config(path: Path):
     """Create list of Stations from station.kdl config"""
+    parse_config = kdl.ParseConfig(
+        valueConverters={"poster": kdl2poster},
+        nodeConverters={"station": NodeConverter(Station),
+                        "event":   NodeConverter(Event), 
+                        "poster":  NodeConverter(Poster),
+                        "stations": reduce_node,
+                        "events":   reduce_node,
+                        "posters":  reduce_node})
+
     with open(path, "r", encoding="utf-8") as file:
-        doc = kdl.parse(file.read(), config=KDL_PARSECONFIG)
+        doc = kdl.parse(file.read(), config=parse_config)
     return doc
 
 def load_data() -> tuple[list[Station], list[Event], list[Poster]]:
     """Load stations, events and posters from kdl config"""
-    doc = load_config(CONFIG)
+    doc = load_config(CONFIG_PATH)
 
     stations = doc.get("stations")
     if stations is None:
