@@ -30,7 +30,7 @@ FONT_EVENT = Font(font=("Helvetica", 14, "bold"))
 HEIGHT_ICON = FONT_DEPARTURE.metrics("linespace") # icons and departures have same height
 WIDTH_ICON = 40
 WIDTH_DIRECTION = 250
-WIDTH_TIME = FONT_DEPARTURE.measure("000") # space for MMM time format
+WIDTH_TIME = FONT_DEPARTURE.measure("00") # space for MMM time format
 
 WIDTH_DATE = FONT_EVENT.measure("00.00.") # space for DD.MM. date format
 
@@ -46,8 +46,8 @@ COLOR_BG_EVENT   = "#4070c5"
 
 
 STATION_UPDATE_TIME =  5_000
-EVENT_UPDATE_TIME   = 5_000 #18_000
-POSTER_UPDATE_TIME  = 5_000 #18_000
+EVENT_UPDATE_TIME   = 18_000
+POSTER_UPDATE_TIME  = 18_000
 
 
 PATH = Path(__file__).parents[1].resolve() / "data"

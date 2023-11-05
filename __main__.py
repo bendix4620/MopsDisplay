@@ -81,17 +81,18 @@ def main(root):
     # define root geometry
     # ------------------------------------------------------------------------------
     root.geometry("1280x1024")
-    # root.attributes("-fullscreen", True)
-    root.rowconfigure(0, weight=1)
+    root.rowconfigure(0, weight=0)
+    root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=3)
     root.columnconfigure(1, weight=1)
+    # root.attributes("-fullscreen", True)
 
     stations, events, posters = load_data()
 
     # create stations
     # ---------------
     station_canvas = GridCanvas(root, flush="w", background=COLOR_BG_STATION, highlightthickness=0)
-    station_canvas.grid(row=0, column=0, sticky="NESW")
+    station_canvas.grid(row=0, column=0, rowspan=2, sticky="NESW")
 
     for row, station in enumerate(stations):
         artist = create_station_artist(station_canvas, row, station)
@@ -101,12 +102,13 @@ def main(root):
     # create events and posters
     # -------------------------
     event_canvas = GridCanvas(root, flush="center", background=COLOR_BG_EVENT, highlightthickness=0)
-    event_canvas.grid(row=0, column=1, sticky="NSEW")
+    event_canvas.grid(row=1, column=1, sticky="NSEW")
 
     for event in events:
         event_artist = EventArtist(event_canvas, event)
         EVENT_ARTISTS.append(event_artist)
-    stack = StackArtist(event_canvas, 0, 0, anchor="center", flush="w", artists=EVENT_ARTISTS)
+    title_artist = TitleArtist(event_canvas, "nächste Veranstaltungen:\n", font=FONT_EVENT, anchor="w")
+    stack = StackArtist(event_canvas, 0, 0, anchor="center", flush="w", artists=[title_artist] + EVENT_ARTISTS)
     event_canvas.set(0, 0, stack)
     offset = 1
 
@@ -114,9 +116,15 @@ def main(root):
         artist = PosterArtist(event_canvas, poster)
         event_canvas.set(offset+row, 0, artist)
         POSTER_ARTISTS.append(artist)
+    
+    # create clock and hu logo
+    # ------------------------
+    logo_canvas = GridCanvas(root, flush="nw", background=COLOR_BG_EVENT, highlightthickness=0)
+    logo_canvas.grid(row=0, column=1, sticky="NESW")
+    # TODO: create clock and hu logo
 
-    update_stations()
-    update_posters()
+    root.after(0, update_stations)
+    root.after(0, update_posters)
     root.mainloop()
 
 if __name__ == "__main__":

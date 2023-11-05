@@ -19,7 +19,7 @@ def lineheight(font: Font):
     return 1.3 * fontheight(font)
 
 def textheight(text: str, font: Font):
-    lines = max(1, text.count("\n"))
+    lines = 1 + text.count("\n")
     return (0.3 + lines) * fontheight(font)
 
 def textwidth(text: str, font: Font):
@@ -232,7 +232,7 @@ class DepartureArtist(Artist):
         # create contents
         self.last_tripid = None
         self.id_icon = self.canvas.create_image(0, 0, anchor="center")
-        self.id_drct = self.canvas.create_text(0, 0, anchor="w", font=FONT_DEPARTURE, fill=COLOR_TXT)
+        self.id_drct = self.canvas.create_text(0, 0, text="could not fetch departure", anchor="w", font=FONT_DEPARTURE, fill=COLOR_ERROR)
         self.id_dots = self.canvas.create_text(0, 0, anchor="e", font=FONT_DEPARTURE, fill=COLOR_TXT)
         self.id_time = self.canvas.create_text(0, 0, anchor="e", font=FONT_DEPARTURE, fill=COLOR_TXT)
 
@@ -269,7 +269,7 @@ class DepartureArtist(Artist):
         """Change the displayed icon"""
         # no deaprture found
         if departure is None:
-            self.canvas.itemconfigure(self.id_icon, image=None)
+            self.canvas.itemconfigure(self.id_icon, image=ICONS.get("empty"))
             return
 
         # get icon
@@ -287,13 +287,13 @@ class DepartureArtist(Artist):
     def configure_drct(self, departure: Departure|None):
         """Change the displayed direction"""
         # no departure found
-        if departure is None:
+        string = getattr(departure, "direction", None)
+        if not isinstance(string, str):
             self.canvas.itemconfigure(self.id_drct, text="could not fetch departure", fill=COLOR_ERROR)
             self.canvas.itemconfigure(self.id_dots, text=" ")
             return
 
         # get display string and dots
-        string = departure.direction
         for filt, replacement in DIRECTION_FILTER:
             string = string.replace(filt, replacement)
 
@@ -305,16 +305,17 @@ class DepartureArtist(Artist):
             count = ((available-occupied) // width_dot)
             dots = "." * count if count > 1 else ""
         else:
+            print(f"Warning: direction name too long! {string}")
             idx = len(string)
-            occupied = 3 * width_dot
+            occupied = width_dot
             for i, char in enumerate(string):
                 new_occupied = occupied + textwidth(char, FONT_DEPARTURE)
                 if new_occupied >= available:
                     idx = i
                     break
                 occupied = new_occupied
-            string = string[:idx]
-            dots = "." * (3 + (available-occupied) // width_dot)
+            string = string[:idx] + "."
+            dots = ""
 
         # configure
         self.canvas.itemconfigure(self.id_drct, text=string, fill=COLOR_TXT)
@@ -327,20 +328,19 @@ class DepartureArtist(Artist):
             self.canvas.itemconfigure(self.id_time, text=" ")
             return
 
-        time = str(floor(departure.time_left))
+        time = "?" if departure.time_left is None else str(floor(departure.time_left))
         color = COLOR_TXT if departure.reachable else COLOR_NOTIME
         self.canvas.itemconfigure(self.id_time, text=time, fill=color)
 
 
 class TitleArtist(Artist):
     """Display a title"""
-    WIDTH_SPACE = textwidth(" ", FONT_TITLE)
 
-    def __init__(self, canvas: Canvas, text: str, anchor=None):
-        height = lineheight(FONT_TITLE)
+    def __init__(self, canvas: Canvas, text: str, font: Font = FONT_TITLE, anchor=None):
+        height = textheight(text, font)
         super().__init__(canvas, 0, 0, 1, height, anchor=anchor)
 
-        self.id_title = self.canvas.create_text(0, 0, text=text, anchor=self.anchor, font=FONT_TITLE, fill=COLOR_TXT)
+        self.id_title = self.canvas.create_text(0, 0, text=text, anchor=self.anchor, font=font, fill=COLOR_TXT)
 
     def update_position(self):
         self.canvas.coords(self.id_title, self.x, self.y)
@@ -371,7 +371,9 @@ class PosterArtist(Artist):
     """Display cycling posters"""
 
     def __init__(self, canvas: Canvas, poster: Poster, anchor=None):
-        super().__init__(canvas, 0, 0, WIDTH_POSTER, HEIGHT_POSTER, anchor=anchor)
+        width = max(img.width() for img in poster.images)
+        height = max(img.height() for img in poster.images)
+        super().__init__(canvas, 0, 0, width, height, anchor=anchor)
 
         self.canvas = canvas
         self.posters = cycle(poster.images)

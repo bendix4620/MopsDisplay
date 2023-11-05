@@ -41,7 +41,7 @@ stations {
     station {
         name "S Adlershof"
         id "900193002"
-        departure_rows (u8)10
+        departure_rows (u8)14
         departure_cols (u8)2
 
         /* fetch during day time */
@@ -85,13 +85,13 @@ stations {
         stop_night  "05:00:00"
 
         min_time 3
-        max_time 45
+        max_time 60
         time_needed 5
     }
     station {
         name "Magnusstr."
         id "900194501"
-        departure_rows (u8)5
+        departure_rows (u8)7
         departure_cols (u8)2
 
         T_day true

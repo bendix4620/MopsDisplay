@@ -1,6 +1,7 @@
 """Fetch departures of stations from BVG API"""
 
 from __future__ import annotations
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from dateutil import parser as dateparser
@@ -98,20 +99,27 @@ class Station:
         except requests.exceptions.JSONDecodeError:
             data = {"departures": []}
 
-        for departure in data.get("departures", []):
-            yield self._create_departure(departure)
+        for departure_data in data.get("departures", []):
+            yield self._create_departure(departure_data)
 
     def _create_departure(self, data: dict):
         """Departure factory"""
-        time = time_left(data["when"])
+        # TODO: what to do with time_left<0 departures?
+        line = data.get("line", None)
+        time = None
+        reachable=False
+        with suppress(Exception):
+            time = time_left(data["when"])
+            reachable = time > self.time_needed
+
         departure = Departure(
-            id=data["tripId"],
-            line=data["line"]["id"],
-            direction=data["direction"],
+            id=data.get("tripId", None),
+            line=line.get("id", None),
+            direction=data.get("direction", None),
             time_left=time,
-            delay=data["delay"],
-            product=data["line"]["product"],
-            reachable=time > self.time_needed)
+            delay=data.get("delay", None),
+            product=data.get("product", None),
+            reachable=reachable)
         return departure
 
 
@@ -150,7 +158,7 @@ def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str)
     C = time < stop
     return (B and C) if A else (B or C)
 
-def time_left(timestr: str) -> int:
+def time_left(timestr: str|None) -> int:
     """Parse string and calculate remaining time in minutes"""
     dep = dateparser.parse(timestr)
     time = dep - datetime.now(dep.tzinfo)
