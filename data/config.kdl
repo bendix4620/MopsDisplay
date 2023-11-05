@@ -27,14 +27,12 @@ events {
 posters {
     /*
     poster {
-        img (posterpath)"file path relative to ./posters"
+        /* path must be relative to repository/data/posters */
+        images (poster)"path" (poster)"path" ...
     }
     */
     poster {
-        img (poster)"awarenessDE.png"
-    }
-    poster {
-        img (poster)"ringbahn0.jpg"
+        images (poster)"ringbahn0.jpg" (poster)"awarenessDE.png"
     }
 }
 
@@ -70,13 +68,13 @@ stations {
 
         /* time given in minutes */
         min_time 8 /* min time left for fetched departures */
-        max_time 42 /* max time left for fetched departures */
+        max_time 90 /* max time left for fetched departures */
         time_needed 11 /* min time needed to reach station */
     }
     station {
         name "Karl-Ziegler-Str."
         id "900194016"
-        departure_rows (u8)10
+        departure_rows (u8)5
         departure_cols (u8)2
         
         T_day true
@@ -87,13 +85,13 @@ stations {
         stop_night  "05:00:00"
 
         min_time 3
-        max_time 28
+        max_time 45
         time_needed 5
     }
     station {
         name "Magnusstr."
         id "900194501"
-        departure_rows (u8)10
+        departure_rows (u8)5
         departure_cols (u8)2
 
         T_day true
@@ -104,7 +102,7 @@ stations {
         stop_night  "05:00:00"
 
         min_time 3
-        max_time 24
+        max_time 45
         time_needed 5
     }
 }

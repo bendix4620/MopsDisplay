@@ -21,7 +21,14 @@ class Event:
 @dataclass(frozen=True, order=True, kw_only=True)
 class Poster:
     """Poster data"""
-    img: PhotoImage
+    images: list[PhotoImage]
+
+    def __post_init__(self):
+        # ensure that images is iterable
+        try:
+            _ = iter(self.images)
+        except TypeError:
+            object.__setattr__(self, "images", [self.images])
 
 
 @dataclass(frozen=True, order=True, kw_only=True)
@@ -85,13 +92,14 @@ class Station:
         """Fetch departures from BVG API"""
 
         url = self.get_url()
+        response = session.get(url, timeout=30_000)
         try:
-            response = session.get(url, timeout=30_000).json()
+            data = response.json()
         except requests.exceptions.JSONDecodeError:
-            response = {"departures": []}
+            data = {"departures": []}
 
-        for data in response.get("departures", []):
-            yield self._create_departure(data)
+        for departure in data.get("departures", []):
+            yield self._create_departure(departure)
 
     def _create_departure(self, data: dict):
         """Departure factory"""

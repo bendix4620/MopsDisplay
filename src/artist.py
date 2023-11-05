@@ -54,9 +54,9 @@ corner2center_y = {
     "ne": lambda y, h: y+h/2,
     "se": lambda y, h: y-h/2,
     "sw": lambda y, h: y-h/2,
-    "n":  lambda y, h: y-h/2,
+    "n":  lambda y, h: y+h/2,
     "e":  lambda y, h: y,
-    "s":  lambda y, h: y+h/2,
+    "s":  lambda y, h: y-h/2,
     "w":  lambda y, h: y,
     "center": lambda y, h: y
 }
@@ -66,37 +66,32 @@ center2corner_y = {
     "ne": lambda y, h: y-h/2,
     "se": lambda y, h: y+h/2,
     "sw": lambda y, h: y+h/2,
-    "n":  lambda y, h: y+h/2,
+    "n":  lambda y, h: y-h/2,
     "e":  lambda y, h: y,
-    "s":  lambda y, h: y-h/2,
+    "s":  lambda y, h: y+h/2,
     "w":  lambda y, h: y,
     "center": lambda y, h: y
 }
 
+def _validate_corner(corner: str|None) -> str:
+    if corner is None:
+        return "center"
+    if corner in corner2center_x:
+        return corner
+    raise ValueError(f"Unexpected anchor/corner {corner}")
 
-class Artist(ABC):
-    """Artist with static size"""
 
-    def __init__(self, x, y, width, height, anchor=None):
-        if anchor is None:
-            anchor = "center" # center = default
-        self._anchor = self._validate_corner(anchor)
-        self._x = x
-        self._y = y
+class Cell:
+    """Cell with static size"""
+
+    def __init__(self, x: int, y: int, width: int, height: int, anchor: str=None):
+        self._x = int(x)
+        self._y = int(y)
         self._width = int(width)
         self._height = int(height)
-
-    @abstractmethod
-    def update_position(self):
-        """Perform position update"""
-        print(f"move {type(self).__name__: <20} x={self.x} y={self.y}")
-
-    def _validate_corner(self, corner: str|None) -> str:
-        if corner is None:
-            return "center"
-        if corner in corner2center_x:
-            return corner
-        raise ValueError(f"Unexpected anchor/corner {corner}")
+        if anchor is None:
+            anchor = "center" # center = default
+        self._anchor = _validate_corner(anchor)
 
     def _corners_differ(self, corner: str|None) -> bool:
         if corner == self.anchor:
@@ -105,7 +100,7 @@ class Artist(ABC):
 
     def get_x(self, corner: str|None) -> int:
         """Get x coordinate of a corner"""
-        corner = self._validate_corner(corner)
+        corner = _validate_corner(corner)
         x = self.x
         if self._corners_differ(corner):
             x = corner2center_x[self.anchor](x, self.width)
@@ -114,7 +109,7 @@ class Artist(ABC):
 
     def set_x(self, x: int, corner: str|None):
         """Move x coordinate of a corner to the given value"""
-        corner = self._validate_corner(corner)
+        corner = _validate_corner(corner)
         self.x += x - self.get_x(corner)
 
     @property
@@ -128,16 +123,16 @@ class Artist(ABC):
 
     def get_y(self, corner: str|None) -> int:
         """Get y coordinate of a corner"""
-        corner = self._validate_corner(corner)
+        corner = _validate_corner(corner)
         y = self.y
         if self._corners_differ(corner):
-            y = corner2center_y[self.anchor](y, self.width)
-            y = center2corner_y[corner](y, self.width)
+            y = corner2center_y[self.anchor](y, self.height)
+            y = center2corner_y[corner](y, self.height)
         return y
 
     def set_y(self, y: int, corner: str|None):
         """Move y coordinate of a corner to the given value"""
-        corner = self._validate_corner(corner)
+        corner = _validate_corner(corner)
         self.y += y - self.get_y(corner)
 
     @property
@@ -166,76 +161,118 @@ class Artist(ABC):
         """
         return self._anchor
 
+    @property
+    def bbox(self) -> tuple[int, int, int, int]:
+        """Artist bounding box (x0, y0, x1, y1)"""
+        return self.get_x("nw"), self.get_y("nw"), self.get_x("se"), self.get_y("se")
+
+
+class Artist(Cell):
+    """Artist that draws on a canvas"""
+
+    def __init__(self, canvas: Canvas, x: int, y: int, width: int, height: int, anchor: str=None):
+        super().__init__(x, y, width, height, anchor=anchor)
+
+        self.canvas = canvas
+        self._debug_id_border = None
+        self._debug_id_anchor = None
+
+    def update_position(self):
+        """Perform position update"""
+
+    def draw_debug_outlines(self, depth: int=0):
+        """Draw outlines and anchor position"""
+        print(f"Drawing {type(self).__name__: <15} at x={self.x:<4} y={self.y:<4} w={self.width:<4} h={self.height:<4} a={self.anchor:<4} bbox={self.bbox}")
+
+        color = DEBUG_COLORS[depth % len(DEBUG_COLORS)]
+        radius = 5
+        self.canvas.create_rectangle(*self.bbox, tags="debug_outlines", outline=color)
+        self.canvas.create_oval(self.x-radius, self.y-radius, self.x+radius, self.y+radius, tags="debug_outlines", fill=color)
+
 
 class StackArtist(Artist):
     """Vertical stack of artists, has constant size"""
 
-    def __init__(self, x, y, anchor=None, flush=None, artists: list[Artist]=None):
-        self.flush = self._validate_corner(flush)
+    def __init__(self, canvas: Canvas, x: int, y: int, anchor=None, flush=None, artists: list[Artist]=None):
+        self.flush = _validate_corner(flush)
         self._artists: list[Artist] = [] if artists is None else artists
 
         height = sum(a.height for a in self._artists)
-        width = max(a.width for a in self._artists) if len(self._artists) > 0 else 1
-        super().__init__(x, y, width, height, anchor=anchor)
+        width = max(a.width for a in self._artists) if len(self._artists) > 0 else 0
+        super().__init__(canvas, x, y, width, height, anchor=anchor)
 
     def update_position(self):
+        """Perform position update"""
         x = self.get_x(self.flush)
-        y = self.get_y("n")
+        y = self.get_y("nw")
         for artist in self._artists:
             artist.set_x(x, self.flush)
-            artist.set_y(y, "n")
+            artist.set_y(y, "nw")
             y += artist.height
             artist.update_position()
         return super().update_position()
 
+    def draw_debug_outlines(self, depth: int=0):
+        """Draw a rectangle around the child bounding boxes and a circle at the anchor"""
+        for artist in self._artists:
+            artist.draw_debug_outlines(depth=depth+1)
+        return super().draw_debug_outlines(depth)
+
 
 class DepartureArtist(Artist):
     """Display a departure on a canvas"""
+    WIDTH_SPACE = textwidth(" ", FONT_DEPARTURE)
 
     def __init__(self, canvas: Canvas, anchor: str=None):
         # create artist
-        width = WIDTH_ICON + WIDTH_DIRECTION + WIDTH_TIME
+        width = WIDTH_ICON + WIDTH_DIRECTION + WIDTH_TIME + 2*self.WIDTH_SPACE
         height = lineheight(FONT_DEPARTURE)
-        super().__init__(0, 0, width, height, anchor=anchor)
+        super().__init__(canvas, 0, 0, width, height, anchor=anchor)
 
         # create contents
-        self.canvas = canvas
-        self.last_tripId = None
+        self.last_tripid = None
         self.id_icon = self.canvas.create_image(0, 0, anchor="center")
         self.id_drct = self.canvas.create_text(0, 0, anchor="w", font=FONT_DEPARTURE, fill=COLOR_TXT)
+        self.id_dots = self.canvas.create_text(0, 0, anchor="e", font=FONT_DEPARTURE, fill=COLOR_TXT)
         self.id_time = self.canvas.create_text(0, 0, anchor="e", font=FONT_DEPARTURE, fill=COLOR_TXT)
 
     def update_position(self):
-        # pylint: disable=assignment-from-no-return
-
         x = self.get_x("w")
         y = self.get_y("w")
         self.canvas.coords(self.id_icon, x + WIDTH_ICON//2, y)
-        self.canvas.coords(self.id_drct, x + WIDTH_ICON, y)
-        self.canvas.coords(self.id_time, x + self.width, y)
-
+        x += WIDTH_ICON + self.WIDTH_SPACE
+        self.canvas.coords(self.id_drct, x, y)
+        x += WIDTH_DIRECTION
+        self.canvas.coords(self.id_dots, x, y)
+        x += self.WIDTH_SPACE + WIDTH_TIME
+        self.canvas.coords(self.id_time, x, y)
         return super().update_position()
 
     def update_departure(self, departure: Departure|None):
         """Update departure information"""
-        if departure is None:
-            self.clear_departure()
-            return
+        tripid = getattr(departure, "id", None)
 
-        if departure.id != self.last_tripId:
-            self.last_tripId = departure.id
-            self.canvas.itemconfigure(self.id_icon, image=self._display_icon(departure))
-            self.canvas.itemconfigure(self.id_drct, text=self._display_dest(departure), fill=COLOR_TXT)
-        self.canvas.itemconfigure(self.id_time, text=self._display_time(departure), fill=self._display_color(departure))
+        if tripid != self.last_tripid:
+            self.last_tripid = tripid
+            self.configure_icon(departure)
+            self.configure_drct(departure)
+        self.configure_time(departure)
 
     def clear_departure(self):
         """Clear departure display"""
-        self.last_tripId = None
-        self.canvas.itemconfigure(self.id_icon, image=None)
-        self.canvas.itemconfigure(self.id_drct, text="could not fetch departure", fill=COLOR_ERROR)
-        self.canvas.itemconfigure(self.id_time, text=" ")
+        self.last_tripid = None
+        self.configure_icon(None)
+        self.configure_drct(None)
+        self.configure_time(None)
 
-    def _display_icon(self, departure: Departure) -> PhotoImage:
+    def configure_icon(self, departure: Departure|None):
+        """Change the displayed icon"""
+        # no deaprture found
+        if departure is None:
+            self.canvas.itemconfigure(self.id_icon, image=None)
+            return
+
+        # get icon
         icon = ICONS.get(departure.line, None)
         if icon is None:
             icon = ICONS.get(departure.product, None)
@@ -243,41 +280,66 @@ class DepartureArtist(Artist):
         if icon is None:
             icon = ICONS.get("default")
             print(f"Warning: Default images used for {departure.line}")
-        return icon
 
-    def _display_dest(self, departure: Departure) -> str:
-        width = textwidth(departure.direction, FONT_DEPARTURE)
-        idx = -1
+        # configure
+        self.canvas.itemconfigure(self.id_icon, image=icon)
 
-        # only return text that fits in available space
+    def configure_drct(self, departure: Departure|None):
+        """Change the displayed direction"""
+        # no departure found
+        if departure is None:
+            self.canvas.itemconfigure(self.id_drct, text="could not fetch departure", fill=COLOR_ERROR)
+            self.canvas.itemconfigure(self.id_dots, text=" ")
+            return
+
+        # get display string and dots
+        string = departure.direction
+        for filt, replacement in DIRECTION_FILTER:
+            string = string.replace(filt, replacement)
+
+        width_dot = textwidth(".", FONT_DEPARTURE)
         available = WIDTH_DIRECTION
-        if width >= available:
-            occupied = textwidth("...", FONT_DEPARTURE)
-            for i, char in enumerate(departure.direction):
-                if occupied >= available:
+        occupied = textwidth(string, FONT_DEPARTURE)
+
+        if occupied < available:
+            count = ((available-occupied) // width_dot)
+            dots = "." * count if count > 1 else ""
+        else:
+            idx = len(string)
+            occupied = 3 * width_dot
+            for i, char in enumerate(string):
+                new_occupied = occupied + textwidth(char, FONT_DEPARTURE)
+                if new_occupied >= available:
                     idx = i
                     break
-                occupied += textwidth(char, FONT_DEPARTURE)
-            return departure.direction[:idx] + "..."
+                occupied = new_occupied
+            string = string[:idx]
+            dots = "." * (3 + (available-occupied) // width_dot)
 
-        # TODO: fill with monospaced dots from right if there is space
-        return departure.direction
+        # configure
+        self.canvas.itemconfigure(self.id_drct, text=string, fill=COLOR_TXT)
+        self.canvas.itemconfigure(self.id_dots, text=dots)
 
-    def _display_time(self, departure: Departure) -> str:
-        return str(floor(departure.time_left))
+    def configure_time(self, departure: Departure|None) -> str:
+        """configure time left"""
+        # no departure found
+        if departure is None:
+            self.canvas.itemconfigure(self.id_time, text=" ")
+            return
 
-    def _display_color(self, departure: Departure) -> str:
-        return COLOR_TXT if departure.reachable else COLOR_NOTIME
+        time = str(floor(departure.time_left))
+        color = COLOR_TXT if departure.reachable else COLOR_NOTIME
+        self.canvas.itemconfigure(self.id_time, text=time, fill=color)
 
 
 class TitleArtist(Artist):
     """Display a title"""
+    WIDTH_SPACE = textwidth(" ", FONT_TITLE)
 
     def __init__(self, canvas: Canvas, text: str, anchor=None):
         height = lineheight(FONT_TITLE)
-        super().__init__(0, 0, 1, height, anchor=anchor)
+        super().__init__(canvas, 0, 0, 1, height, anchor=anchor)
 
-        self.canvas = canvas
         self.id_title = self.canvas.create_text(0, 0, text=text, anchor=self.anchor, font=FONT_TITLE, fill=COLOR_TXT)
 
     def update_position(self):
@@ -287,13 +349,13 @@ class TitleArtist(Artist):
 
 class EventArtist(Artist):
     """Display event information"""
+    WIDTH_SPACE = textwidth(" ", FONT_EVENT)
 
     def __init__(self, canvas: Canvas, event: Event, anchor=None):
-        width = WIDTH_DATE + WIDTH_EVENT
+        width = WIDTH_DATE + self.WIDTH_SPACE + textwidth(event.desc, FONT_EVENT)
         height = max(textheight(event.date, FONT_EVENT), textheight(event.desc, FONT_EVENT))
-        super().__init__(0, 0, width, height, anchor=anchor)
+        super().__init__(canvas, 0, 0, width, height, anchor=anchor)
 
-        self.canvas = canvas
         self.id_date = self.canvas.create_text(0, 0, text=event.date, anchor="nw", font=FONT_EVENT, fill=COLOR_TXT)
         self.id_desc = self.canvas.create_text(0, 0, text=event.desc, anchor="nw", font=FONT_EVENT, fill=COLOR_TXT)
 
@@ -301,18 +363,18 @@ class EventArtist(Artist):
         x = self.get_x("nw")
         y = self.get_y("nw")
         self.canvas.coords(self.id_date, x, y)
-        self.canvas.coords(self.id_desc, x+WIDTH_DATE, y)
+        self.canvas.coords(self.id_desc, x+WIDTH_DATE+self.WIDTH_SPACE, y)
         return super().update_position()
 
 
 class PosterArtist(Artist):
     """Display cycling posters"""
 
-    def __init__(self, canvas: Canvas, posters: list[Poster], anchor=None):
-        super().__init__(0, 0, WIDTH_POSTER, HEIGHT_POSTER, anchor=anchor)
+    def __init__(self, canvas: Canvas, poster: Poster, anchor=None):
+        super().__init__(canvas, 0, 0, WIDTH_POSTER, HEIGHT_POSTER, anchor=anchor)
 
         self.canvas = canvas
-        self.posters = cycle(p.img for p in posters)
+        self.posters = cycle(poster.images)
         self.id_poster = self.canvas.create_image(0, 0, image=next(self.posters), anchor="center")
 
     def update_position(self):
@@ -327,10 +389,11 @@ class PosterArtist(Artist):
 class GridCanvas(Canvas):
     """Canvas that evenly aligns artists in a grid"""
 
-    def __init__(self, master):
-        super().__init__(master, background=COLOR_BG, highlightthickness=0)
+    def __init__(self, master, flush: str=None, **options):
+        super().__init__(master, **options)
         self.bind("<Configure>", self.on_resize)
 
+        self.flush = _validate_corner(flush)
         self.artists: dict[tuple[int, int], Artist] = {}
 
     def set(self, row: int, col: int, artist: Artist):
@@ -350,36 +413,34 @@ class GridCanvas(Canvas):
         widths = []
         heights = []
         for (row, col), artist in self.artists.items():
-            while len(heights) <= row:
-                heights.append(0)
             while len(widths) <= col:
                 widths.append(0)
+            while len(heights) <= row:
+                heights.append(0)
+            widths[col]  = max(widths[col],  artist.width)
             heights[row] = max(heights[row], artist.height)
-            widths[col] = max(widths[col], artist.width)
         return widths, heights
 
     def on_resize(self, event):
         """Canvas resize event callback, venly space artists"""
-        print("move", type(self))
+        self.delete("debug_outlines") # delete debug outlines, since they will be redrawn
 
         widths, heights = self.query_size()
         padx = (event.width  - sum(widths) ) / (1 + len(widths) )
         pady = (event.height - sum(heights)) / (1 + len(heights))
 
-        center_x = corner2center_x["nw"]
-        center_y = corner2center_y["nw"]
         y = pady
         for row, height in enumerate(heights):
             x = padx
             for col, width in enumerate(widths):
                 artist = self.artists.get((row, col), None)
                 if artist is not None:
-                    # align artist towards its anchor
-                    # only has an effect if artists have different sizes
-                    # artist.x = center2corner_x[artist.anchor](center_x(x, width), width)
-                    # artist.y = center2corner_y[artist.anchor](center_y(y, height), height)
-                    artist.set_x(x, "nw")
-                    artist.set_y(y, "nw")
+                    cell = Artist(self, x, y, width, height, anchor="nw")
+                    artist.set_x(cell.get_x(self.flush), self.flush)
+                    artist.set_y(cell.get_y(self.flush), self.flush)
                     artist.update_position()
+                    if DEBUG:
+                        cell.draw_debug_outlines(depth=0)
+                        artist.draw_debug_outlines(depth=1)
                 x += width + padx
             y += height + pady
