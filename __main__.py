@@ -6,8 +6,6 @@ Co-Authored-By: Hazel Reimer
 """
 
 from itertools import zip_longest
-from functools import wraps
-import time
 from src import root
 from src.defines import *
 from src.data import Event, Poster, Station, Departure
@@ -15,26 +13,12 @@ from src.config import load_data
 from src.artist import StackArtist, DepartureArtist, TitleArtist, EventArtist, PosterArtist, GridCanvas
 
 
-type StationArtist = tuple[Station, list[DepartureArtist]]
+StationArtist = tuple[Station, list[DepartureArtist]]
 
 STATION_ARTISTS: list[StationArtist] = []
 EVENT_ARTISTS: list[EventArtist] = []
 POSTER_ARTISTS: PosterArtist = []
 
-
-
-def timed(func):
-    """Decorator that measures function execution time"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        total_time = end_time - start_time
-        if DEBUG:
-            print(f'{func.__name__} took {total_time:.4f} seconds')
-        return result
-    return wrapper
 
 def update_stations():
     """periodically update stations"""
@@ -101,7 +85,7 @@ def main(root):
 
     # create events and posters
     # -------------------------
-    event_canvas = GridCanvas(root, flush="center", background=COLOR_BG_EVENT, highlightthickness=0)
+    event_canvas = GridCanvas(root, flush="center", background=COLOR_BG_INFO, highlightthickness=0)
     event_canvas.grid(row=1, column=1, sticky="NSEW")
 
     for event in events:
@@ -119,7 +103,7 @@ def main(root):
     
     # create clock and hu logo
     # ------------------------
-    logo_canvas = GridCanvas(root, flush="nw", background=COLOR_BG_EVENT, highlightthickness=0)
+    logo_canvas = GridCanvas(root, flush="nw", background=COLOR_BG_INFO, highlightthickness=0)
     logo_canvas.grid(row=0, column=1, sticky="NESW")
     # TODO: create clock and hu logo
 

@@ -8,7 +8,8 @@ from tkinter import Canvas
 from tkinter.font import Font
 from PIL.ImageTk import PhotoImage
 
-from .defines import *
+from .defines import * # pylint: disable=wildcard-import,unused-wildcard-import
+from .debug import * # pylint: disable=wildcard-import,unused-wildcard-import
 from .config import Station, Event, Poster
 from .data import Departure
 
@@ -446,3 +447,6 @@ class GridCanvas(Canvas):
                         artist.draw_debug_outlines(depth=1)
                 x += width + padx
             y += height + pady
+
+class Banner(Artist):
+    """Logo and clock"""

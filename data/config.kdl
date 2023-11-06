@@ -41,8 +41,9 @@ stations {
     station {
         name "S Adlershof"
         id "900193002"
-        departure_rows (u8)14
-        departure_cols (u8)2
+        direction1 ""
+        direction2 ""
+        max_departures (u8)5
 
         /* fetch during day time */
         S_day true  /* suburban, S-Bahn */
@@ -74,13 +75,26 @@ stations {
     station {
         name "Karl-Ziegler-Str."
         id "900194016"
-        departure_rows (u8)5
-        departure_cols (u8)2
-        
+        direction1 ""
+        direction2 ""
+        max_departures (u8)5
+
+        S_day false
+        U_day false
         T_day true
         B_day true
+        F_day false
+        E_day false
+        R_day false
+
+        S_night false
+        U_night false
         T_night true
         B_night true
+        F_night false
+        E_night false
+        R_night false
+
         start_night "23:59:00"
         stop_night  "05:00:00"
 
@@ -91,13 +105,26 @@ stations {
     station {
         name "Magnusstr."
         id "900194501"
-        departure_rows (u8)7
-        departure_cols (u8)2
+        direction1 ""
+        direction2 ""
+        max_departures (u8)5
 
+        S_day false
+        U_day false
         T_day true
         B_day true
+        F_day false
+        E_day false
+        R_day false
+
+        S_night false
+        U_night false
         T_night true
         B_night true
+        F_night false
+        E_night false
+        R_night false
+
         start_night "23:59:00"
         stop_night  "05:00:00"
 

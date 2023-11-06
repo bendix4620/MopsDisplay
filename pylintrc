@@ -1,7 +1,6 @@
 [MESSAGES CONTROL]
-disable=
-    wildcard-import
-    unused-wildcard-import
-    too-many-instance-attributes,
-    invalid-name,
-    too-few-public-methods
+disable=wildcard-import,
+        unused-wildcard-import,
+        too-many-instance-attributes,
+        invalid-name,
+        too-few-public-methods

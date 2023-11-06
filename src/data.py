@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
+from functools import wraps
 from dateutil import parser as dateparser
 from PIL.ImageTk import PhotoImage
 import requests
@@ -12,17 +13,49 @@ import requests
 session = requests.Session()
 
 
-@dataclass(frozen=True, order=True, kw_only=True)
+class _Required:
+    """Use as dataclass_enfore_required field default to flag it as required"""
+required = _Required
+
+def do_nothing(*args, **kwargs): # pylint: disable=unused-argument
+    """do nothing"""
+
+def enforce_required(cls):
+    """Class decorator. Return a dataclass and enforce presence of keyword 
+    fields flagged as required.
+    
+    Wraps __post_init__ to raise TypeError if a field value is set to required
+    """
+    __post_init__ = getattr(cls, "__post_init__", do_nothing)
+
+    # the new init function
+    @wraps(__post_init__)
+    def __new_post_init__(self):
+        # look for required fields
+        for name, field in self.__dict__.items():
+            if field is required:
+                raise TypeError(f"{type(self).__name__} missing required keyword argument: '{name}'")
+
+        # call original __post_init__
+        __post_init__(self)
+
+    cls.__post_init__ = __new_post_init__
+    return cls
+
+
+@dataclass(frozen=True)
+@enforce_required
 class Event:
     """Event data"""
-    date: str
-    desc: str
+    date: str = required
+    desc: str = required
 
 
-@dataclass(frozen=True, order=True, kw_only=True)
+@dataclass(frozen=True)
+@enforce_required
 class Poster:
     """Poster data"""
-    images: list[PhotoImage]
+    images: list[PhotoImage] = required
 
     def __post_init__(self):
         # ensure that images is iterable
@@ -32,7 +65,8 @@ class Poster:
             object.__setattr__(self, "images", [self.images])
 
 
-@dataclass(frozen=True, order=True, kw_only=True)
+@dataclass(frozen=True)
+@enforce_required
 class Station:
     """Station data"""
     name: str
@@ -41,22 +75,22 @@ class Station:
     departure_cols: int
 
     # fetch during day time
-    S_day: bool = False # fetch suburban
-    U_day: bool = False # fetch subway
-    T_day: bool = False # fetch tram
-    B_day: bool = False # fetch bus
-    F_day: bool = False # fetch ferry
-    E_day: bool = False # fetch express
-    R_day: bool = False # fetch regional
+    S_day: bool # fetch suburban
+    U_day: bool # fetch subway
+    T_day: bool # fetch tram
+    B_day: bool # fetch bus
+    F_day: bool # fetch ferry
+    E_day: bool # fetch express
+    R_day: bool # fetch regional
 
     # fetch during night time
-    S_night: bool = False # fetch suburban
-    U_night: bool = False # fetch subway
-    T_night: bool = False # fetch tram
-    B_night: bool = False # fetch bus
-    F_night: bool = False # fetch ferry
-    E_night: bool = False # fetch express
-    R_night: bool = False # fetch regional
+    S_night: bool # fetch suburban
+    U_night: bool # fetch subway
+    T_night: bool # fetch tram
+    B_night: bool # fetch bus
+    F_night: bool # fetch ferry
+    E_night: bool # fetch express
+    R_night: bool # fetch regional
 
     start_night: str # start of night service
     stop_night: str # end of night service
@@ -123,7 +157,7 @@ class Station:
         return departure
 
 
-@dataclass(frozen=True, order=True, kw_only=True)
+@dataclass(frozen=True)
 class Departure:
     """Departure data"""
     id: str
@@ -133,6 +167,18 @@ class Departure:
     delay: float
     product: str # suburban, subway, tram, bus, ferry, express, regional
     reachable: bool
+
+    def __lt__(self, other: Departure):
+        return self.time_left < other.time_left
+
+    def __le__(self, other: Departure):
+        return self.time_left <= other.time_left
+
+    def __gt__(self, other: Departure):
+        return self.time_left > other.time_left
+
+    def __ge__(self, other: Departure):
+        return self.time_left >= other.time_left
 
 
 def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str):
