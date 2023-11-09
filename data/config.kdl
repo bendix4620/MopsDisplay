@@ -38,69 +38,180 @@ posters {
 
 
 stations {
-    station {
-        name "S Adlershof"
-        id "900193002"
-        direction1 ""
-        direction2 ""
-        max_departures (u8)5
+    rows { /* station S Adlershof */
+        column { /* north */
+            title "S Adlershof"
+            id "900193002"
+            max_departures (u8)5
 
-        /* fetch during day time */
-        S_day true  /* suburban, S-Bahn */
-        U_day false /* subway U-Bahn */
-        T_day false /* tram */
-        B_day false /* bus */
-        F_day false /* ferry */
-        E_day false /* express, IC/ICE */
-        R_day false /* regional, RE/RB */
+            /* time given in minutes */
+            min_time 8 /* min time left for fetched departures */
+            max_time 90 /* max time left for fetched departures */
+            time_needed 11 /* min time needed to reach station */
 
-        /* fetch during night time */
-        S_night true  /* suburban, S-Bahn */
-        U_night false /* subway U-Bahn */
-        T_night false /* tram */
-        B_night true  /* bus */
-        F_night false /* ferry */
-        E_night false /* express, IC/ICE */
-        R_night false /* regional, RE/RB */
+            /* time given in HH:MM:SS */
+            start_night "23:59:00" /* start of night service */
+            stop_night  "05:00:00" /* stop of night service */
 
-        /* time given in HH:MM:SS */
-        start_night "23:59:00" /* start of night service */
-        stop_night  "05:00:00" /* stop of night service */
+            day { /* fetch during day time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B false /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+            night { /* fetch during night time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B true  /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+        }
+        column { /* south */
+            title ""
+            id "900193002"
+            max_departures (u8)5
 
-        /* time given in minutes */
-        min_time 8 /* min time left for fetched departures */
-        max_time 90 /* max time left for fetched departures */
-        time_needed 11 /* min time needed to reach station */
+            /* time given in minutes */
+            min_time 8 /* min time left for fetched departures */
+            max_time 90 /* max time left for fetched departures */
+            time_needed 11 /* min time needed to reach station */
+
+            /* time given in HH:MM:SS */
+            start_night "23:59:00" /* start of night service */
+            stop_night  "05:00:00" /* stop of night service */
+
+            day { /* fetch during day time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B false /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+            night { /* fetch during night time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B true  /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+        }
     }
-    station {
-        name "Karl-Ziegler-Str."
-        id "900194016"
-        direction1 ""
-        direction2 ""
-        max_departures (u8)5
+    row { /* station Karl-Ziegler-Str. */
+        column { /* towards S Adlershof */
+            title "Karl-Ziegler-Str."
+            id "900194016"
+            max_departures (u8)5
 
-        S_day false
-        U_day false
-        T_day true
-        B_day true
-        F_day false
-        E_day false
-        R_day false
+            min_time 8
+            max_time 90
+            time_needed 11
 
-        S_night false
-        U_night false
-        T_night true
-        B_night true
-        F_night false
-        E_night false
-        R_night false
+            start_night "23:59:00"
+            stop_night  "05:00:00"
 
-        start_night "23:59:00"
-        stop_night  "05:00:00"
+            day { /* fetch during day time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B false /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+            night { /* fetch during night time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B true  /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+        }
+        column { /* towards S Schöneweide */
+            title ""
+            id "900194016"
+            max_departures (u8)5
 
-        min_time 3
-        max_time 60
-        time_needed 5
+            min_time 8
+            max_time 90
+            time_needed 11
+
+            start_night "23:59:00"
+            stop_night  "05:00:00"
+
+            day { /* fetch during day time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B false /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+            night { /* fetch during night time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B true  /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+        }
+    }
+    row { /* station Magnusstr. */
+        column {
+            title "Magnusstr."
+            id "900194501"
+            max_departures (u8)5
+
+            min_time 8
+            max_time 90
+            time_needed 5
+
+            start_night "23:59:00"
+            stop_night  "05:00:00"
+
+            day { /* fetch during day time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B false /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+            night { /* fetch during night time */
+                directions "" ""
+                S true  /* suburban, S-Bahn */
+                U false /* subway U-Bahn */
+                T false /* tram */
+                B true  /* bus */
+                F false /* ferry */
+                E false /* express, IC/ICE */
+                R false /* regional, RE/RB */
+            }
+        }
     }
     station {
         name "Magnusstr."

@@ -5,6 +5,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
+from typing import Generator, Union
 from dateutil import parser as dateparser
 from PIL.ImageTk import PhotoImage
 import requests
@@ -13,49 +14,17 @@ import requests
 session = requests.Session()
 
 
-class _Required:
-    """Use as dataclass_enfore_required field default to flag it as required"""
-required = _Required
-
-def do_nothing(*args, **kwargs): # pylint: disable=unused-argument
-    """do nothing"""
-
-def enforce_required(cls):
-    """Class decorator. Return a dataclass and enforce presence of keyword 
-    fields flagged as required.
-    
-    Wraps __post_init__ to raise TypeError if a field value is set to required
-    """
-    __post_init__ = getattr(cls, "__post_init__", do_nothing)
-
-    # the new init function
-    @wraps(__post_init__)
-    def __new_post_init__(self):
-        # look for required fields
-        for name, field in self.__dict__.items():
-            if field is required:
-                raise TypeError(f"{type(self).__name__} missing required keyword argument: '{name}'")
-
-        # call original __post_init__
-        __post_init__(self)
-
-    cls.__post_init__ = __new_post_init__
-    return cls
-
-
 @dataclass(frozen=True)
-@enforce_required
 class Event:
     """Event data"""
-    date: str = required
-    desc: str = required
+    date: str
+    desc: str
 
 
 @dataclass(frozen=True)
-@enforce_required
 class Poster:
     """Poster data"""
-    images: list[PhotoImage] = required
+    images: list[PhotoImage]
 
     def __post_init__(self):
         # ensure that images is iterable
@@ -64,43 +33,43 @@ class Poster:
         except TypeError:
             object.__setattr__(self, "images", [self.images])
 
+@dataclass(frozen=True)
+class DirectionsAndProducts:
+    directions: list[str]
+    S: bool = False
+    U: bool = False
+    T: bool = False
+    B: bool = False
+    F: bool = False
+    E: bool = False
+    R: bool = False
+
+    def __post_init__(self):
+        # ensure that directions is iterable
+        try:
+            _ = iter(self.directions)
+        except TypeError:
+            object.__setattr__(self, "directions", [self.directions])
 
 @dataclass(frozen=True)
-@enforce_required
 class Station:
     """Station data"""
     name: str
     id: str
-    departure_rows: int
-    departure_cols: int
-
-    # fetch during day time
-    S_day: bool # fetch suburban
-    U_day: bool # fetch subway
-    T_day: bool # fetch tram
-    B_day: bool # fetch bus
-    F_day: bool # fetch ferry
-    E_day: bool # fetch express
-    R_day: bool # fetch regional
-
-    # fetch during night time
-    S_night: bool # fetch suburban
-    U_night: bool # fetch subway
-    T_night: bool # fetch tram
-    B_night: bool # fetch bus
-    F_night: bool # fetch ferry
-    E_night: bool # fetch express
-    R_night: bool # fetch regional
-
-    start_night: str # start of night service
-    stop_night: str # end of night service
+    max_departures: int
 
     # times given in minutes
     min_time: float # min time left for fetched departures
     max_time: float # max time left for fetched departures
     time_needed: float # time needed to reach station
 
+    start_night: str # start of night service
+    stop_night: str # end of night service
 
+    day: DirectionsAndProducts
+    night: DirectionsAndProducts
+
+    @property
     def is_in_night_service(self):
         """Return True if night service is currently active"""
         start = dateparser.parse(self.start_night)
@@ -108,51 +77,63 @@ class Station:
         now = datetime.now()
         return time_is_between(start, now, stop)
 
-    def get_url(self) -> str:
-        """Get BVG API url"""
-        night = self.is_in_night_service()
-        return (f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
-                f"when=in+{self.min_time}+minutes&"
-                f"duration={self.max_time-self.min_time}&"
-                f"results={self.departure_rows*self.departure_cols}&"
-                f"suburban={self.S_night if night else self.S_day}&"
-                f"subway={  self.U_night if night else self.U_day}&"
-                f"tram={    self.T_night if night else self.T_day}&"
-                f"bus={     self.B_night if night else self.B_day}&"
-                f"ferry={   self.F_night if night else self.F_day}&"
-                f"express={ self.E_night if night else self.E_day}&"
-                f"regional={self.R_night if night else self.R_day}")
+    def get_urls(self) -> Generator[str, None, None]:
+        """Get BVG API url for every direction"""
+        dap = self.night if self.is_in_night_service else self.day
+        for direction in dap.directions:
+            yield ( f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
+                    f"direction={direction}&"
+                    f"when=in+{self.min_time}+minutes&"
+                    f"duration={self.max_time-self.min_time}&"
+                    f"results={self.max_departures}&"
+                    f"suburban={dap.S}&"
+                    f"subway={dap.U}&"
+                    f"tram={dap.T}&"
+                    f"bus={dap.B}&"
+                    f"ferry={dap.F}&"
+                    f"express={dap.E}&"
+                    f"regional={dap.R}")
 
     def fetch_departures(self):
         """Fetch departures from BVG API"""
 
-        url = self.get_url()
-        response = session.get(url, timeout=30_000)
-        try:
-            data = response.json()
-        except requests.exceptions.JSONDecodeError:
-            data = {"departures": []}
+        departures = []
+        for url in self.get_urls():
+            response = session.get(url, timeout=30_000)
+            
+            try:
+                data = response.json()
+            except requests.exceptions.JSONDecodeError:
+                data = {"departures": []}
 
-        for departure_data in data.get("departures", []):
-            yield self._create_departure(departure_data)
+            for departure_data in data.get("departures", []):
+                departure = self._create_departure(departure_data)
+                if departure is None:
+                    continue
+                departures.append(departure)
+        departures.sort()
+        return departures
 
-    def _create_departure(self, data: dict):
+    def _create_departure(self, data: dict) -> Union[Departure, None]:
         """Departure factory"""
-        # TODO: what to do with time_left<0 departures?
-        line = data.get("line", None)
-        time = None
-        reachable=False
-        with suppress(Exception):
-            time = time_left(data["when"])
-            reachable = time > self.time_needed
+        # resolve unexpected api departure time outputs
+        timestr = data["when"]
+        if timestr is None:
+            return None
+        time = time_left(timestr)
+        if time < self.min_time:
+            return None
+
+        reachable = time > self.time_needed
+        line = data["line"]
 
         departure = Departure(
-            id=data.get("tripId", None),
-            line=line.get("id", None),
-            direction=data.get("direction", None),
+            id=data["tripId"],
+            line=line["id"],
+            direction=data["direction"],
             time_left=time,
-            delay=data.get("delay", None),
-            product=data.get("product", None),
+            delay=data["delay"],
+            product=data["product"],
             reachable=reachable)
         return departure
 
@@ -180,6 +161,8 @@ class Departure:
     def __ge__(self, other: Departure):
         return self.time_left >= other.time_left
 
+    def __eq__(self, other: Departure) -> bool:
+        return self.id == other.id
 
 def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str):
     """Check if time is between start and stop (considers midnight clock wrap)
@@ -204,7 +187,7 @@ def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str)
     C = time < stop
     return (B and C) if A else (B or C)
 
-def time_left(timestr: str|None) -> int:
+def time_left(timestr: Union[str, None]) -> int:
     """Parse string and calculate remaining time in minutes"""
     dep = dateparser.parse(timestr)
     time = dep - datetime.now(dep.tzinfo)
