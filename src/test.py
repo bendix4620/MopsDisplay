@@ -1,42 +1,68 @@
 from dataclasses import dataclass
-from functools import wraps
+import kdl
 
+raw = """
+grid {
+    row {
+        column {
+            day { 
+                value "0, 0" 
+            }
+            night {
+                value "0, 0, dark"
+            }
+        }
+        column {
+            day {
+                value "0, 1"
+            }
+            night {
+                value "0, 1, dark"
+            }
+        }
+    }
+    row {
+        column {
+            day {
+                value "1, 0"
+            }
+            night {
+                value "1, 0, dark"
+            }
+        }
+        column {
+            day {
+                value "1, 1"
+            }
+            night {
+                value "1, 1, dark"
+            }
+        }
+    }
+}
+"""
 
-class _Required:
-    """Use as dataclass_enfore_required field default to flag it as required"""
-required = _Required
+def strip(x):
+    if isinstance(x, (tuple, list)):
+        if len(x) == 1:
+            return x[0]
+    return x
 
-def do_nothing(*args, **kwargs): # pylint: disable=unused-argument
-    """do nothing"""
+@dataclass
+class Value:
+    value: str
 
-def dataclass_enforce_required(cls):
-    """Class decorator. Return a dataclass and enforce presence of keyword 
-    fields flagged as required.
-    
-    Wraps __post_init__ to raise TypeError if a field value is set to required
-    """
-    __post_init__ = getattr(cls, "__post_init__", do_nothing)
+def node2value(node: kdl.Node, raw: kdl.ParseFragment):
+    args = node.args
+    kwargs = {node.name: strip(node.args) for node in node.nodes}
+    return kdl.Node(node.name, args=[Value(**kwargs)])
 
-    # the new init function
-    @wraps(__post_init__)
-    def __new_post_init__(self):
-        # look for required fields
-        for name, field in self.__dict__.items():
-            if field is required:
-                raise TypeError(f"{type(self).__name__} missing required keyword argument: '{name}'")
+def reduce_node(node: kdl.Node, raw: kdl.ParseFragment):
+    args = node.args
+    for child_node in node.nodes:
+        args.append(strip(child_node.args))
+    return kdl.Node(name=node.name, args=args)
 
-        # call original __post_init__
-        __post_init__(self)
-
-    cls.__post_init__ = __new_post_init__
-    return dataclass(cls)
-
-
-@dataclass_enforce_required
-class C:
-    a: int = required
-    b: int = 0
-    c: int = required
-
-c = C(0)
-print(C)
+config = kdl.ParseConfig()
+config = kdl.ParseConfig(nodeConverters={"day":node2value, "night":node2value, "column": reduce_node, "row": reduce_node, "grid": reduce_node})
+print(repr(kdl.parse(raw, config=config).get("grid")))

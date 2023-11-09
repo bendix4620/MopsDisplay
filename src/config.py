@@ -1,21 +1,21 @@
 """Import data from config.kdl"""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Tuple, Union
 from PIL.ImageTk import PhotoImage
 import kdl
-from .defines import *
-from .data import Station, Event, Poster
+from . import defines as d
+from .data import Station, DirectionsAndProducts, Event, Poster
 
 
 def kdl2poster(string: kdl.String, raw: kdl.ParseFragment) -> PhotoImage: # pylint: disable=unused-argument
     """Convert kdl string to an image path"""
-    path = POSTER_PATH / string.value
+    path = d.POSTER_PATH / string.value
     path = path.resolve()
 
     if not path.is_file():
         raise ValueError(f"Could not find file {path}")
-    return load_image(path, WIDTH_POSTER, HEIGHT_POSTER)
+    return d.load_image(path, d.WIDTH_POSTER, d.HEIGHT_POSTER)
 
 def reduce_node(node: kdl.Node, raw: kdl.ParseFragment) -> kdl.Node: # pylint: disable=unused-argument
     """Move child nodes to node args"""
@@ -29,14 +29,16 @@ class NodeConverter:
         self._cls = cls
         self._strip = strip
 
-    def node2args(self, node: kdl.Node) -> tuple[list, dict]:
+    def node2args(self, node: kdl.Node) -> Tuple[list, dict]:
         """Convert node to *args and **kwargs"""
+        print(repr(node))
+        print()
         args = node.args
         kwargs = {child_node.name: self.strip(child_node.args)
                   for child_node in node.nodes}
         return args, kwargs
 
-    def strip(self, lst: list) -> list | Any:
+    def strip(self, lst: list) -> Union[list, Any]:
         """Strip list if it only has one element"""
         if self._strip and len(lst) == 1:
             return lst[0]
@@ -44,16 +46,19 @@ class NodeConverter:
 
     def __call__(self, node: kdl.Node, raw: kdl.ParseFragment):
         args, kwargs = self.node2args(node)
-        return self._cls(*args, **kwargs)
+        return kdl.Node(name=node.name, args=[self._cls(*args, **kwargs)])
 
 def load_config(path: Path):
     """Create list of Stations from station.kdl config"""
     parse_config = kdl.ParseConfig(
         valueConverters={"poster": kdl2poster},
-        nodeConverters={"station": NodeConverter(Station),
+        nodeConverters={"column":  NodeConverter(Station),
+                        "day":     NodeConverter(DirectionsAndProducts),
+                        "night":   NodeConverter(DirectionsAndProducts),
                         "event":   NodeConverter(Event), 
                         "poster":  NodeConverter(Poster),
                         "stations": reduce_node,
+                        "rows":     reduce_node,
                         "events":   reduce_node,
                         "posters":  reduce_node})
 
@@ -61,9 +66,9 @@ def load_config(path: Path):
         doc = kdl.parse(file.read(), config=parse_config)
     return doc
 
-def load_data() -> tuple[list[Station], list[Event], list[Poster]]:
+def load_data() -> Tuple[List[List[Station]], List[Event], List[Poster]]:
     """Load stations, events and posters from kdl config"""
-    doc = load_config(CONFIG_PATH)
+    doc = load_config(d.CONFIG_PATH)
 
     stations = doc.get("stations")
     if stations is None:

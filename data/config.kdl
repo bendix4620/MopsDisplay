@@ -54,7 +54,7 @@ stations {
             stop_night  "05:00:00" /* stop of night service */
 
             day { /* fetch during day time */
-                directions "" ""
+                directions "900193001"
                 S true  /* suburban, S-Bahn */
                 U false /* subway U-Bahn */
                 T false /* tram */
@@ -64,7 +64,7 @@ stations {
                 R false /* regional, RE/RB */
             }
             night { /* fetch during night time */
-                directions "" ""
+                directions "900193001" "900192512" "900193504" "900193500"
                 S true  /* suburban, S-Bahn */
                 U false /* subway U-Bahn */
                 T false /* tram */
@@ -89,7 +89,7 @@ stations {
             stop_night  "05:00:00" /* stop of night service */
 
             day { /* fetch during day time */
-                directions "" ""
+                directions "900195510" "900186001"
                 S true  /* suburban, S-Bahn */
                 U false /* subway U-Bahn */
                 T false /* tram */
@@ -99,7 +99,7 @@ stations {
                 R false /* regional, RE/RB */
             }
             night { /* fetch during night time */
-                directions "" ""
+                directions "900195510" "900186001" "900194504"
                 S true  /* suburban, S-Bahn */
                 U false /* subway U-Bahn */
                 T false /* tram */
@@ -110,7 +110,8 @@ stations {
             }
         }
     }
-    row { /* station Karl-Ziegler-Str. */
+
+    rows { /* station Karl-Ziegler-Str. */
         column { /* towards S Adlershof */
             title "Karl-Ziegler-Str."
             id "900194016"
@@ -120,29 +121,15 @@ stations {
             max_time 90
             time_needed 11
 
-            start_night "23:59:00"
-            stop_night  "05:00:00"
+            start_night "03:00:00"
+            stop_night  "04:00:00"
 
             day { /* fetch during day time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B false /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
+                directions "900194501"
+                T true
+                B true
             }
-            night { /* fetch during night time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B true  /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
-            }
+            /* no night serice available */
         }
         column { /* towards S Schöneweide */
             title ""
@@ -157,29 +144,16 @@ stations {
             stop_night  "05:00:00"
 
             day { /* fetch during day time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B false /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
+                directions "900194537"
+                T true
+                B true
             }
-            night { /* fetch during night time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B true  /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
-            }
+            /* no night service available */
         }
     }
-    row { /* station Magnusstr. */
-        column {
+
+    rows { /* station Magnusstr. */
+        column { /* towards S Adlershof */
             title "Magnusstr."
             id "900194501"
             max_departures (u8)5
@@ -192,55 +166,38 @@ stations {
             stop_night  "05:00:00"
 
             day { /* fetch during day time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B false /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
+                directions "900194504"
+                T true
+                B true
             }
             night { /* fetch during night time */
-                directions "" ""
-                S true  /* suburban, S-Bahn */
-                U false /* subway U-Bahn */
-                T false /* tram */
-                B true  /* bus */
-                F false /* ferry */
-                E false /* express, IC/ICE */
-                R false /* regional, RE/RB */
+                directions "900194504"
+                T true
+                B true 
             }
         }
-    }
-    station {
-        name "Magnusstr."
-        id "900194501"
-        direction1 ""
-        direction2 ""
-        max_departures (u8)5
+        column { /* towards Rudow/BER/S Schöneweide */
+            title ""
+            id "900194501"
+            max_departures (u8)5
 
-        S_day false
-        U_day false
-        T_day true
-        B_day true
-        F_day false
-        E_day false
-        R_day false
+            min_time 8
+            max_time 90
+            time_needed 5
 
-        S_night false
-        U_night false
-        T_night true
-        B_night true
-        F_night false
-        E_night false
-        R_night false
+            start_night "23:59:00"
+            stop_night  "05:00:00"
 
-        start_night "23:59:00"
-        stop_night  "05:00:00"
-
-        min_time 3
-        max_time 45
-        time_needed 5
+            day { /* fetch during day time */
+                directions "900194016" "900194015"
+                T true
+                B true
+            }
+            night { /* fetch during night time */
+                directions "900194015"
+                T true
+                B true 
+            }
+        }
     }
 }

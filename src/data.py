@@ -5,7 +5,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
-from typing import Generator, Union
+from typing import Generator, Iterator, Union
 from dateutil import parser as dateparser
 from PIL.ImageTk import PhotoImage
 import requests
@@ -27,10 +27,8 @@ class Poster:
     images: list[PhotoImage]
 
     def __post_init__(self):
-        # ensure that images is iterable
-        try:
-            _ = iter(self.images)
-        except TypeError:
+        # ensure that images is a list
+        if not isinstance(self.images, (list, tuple)):
             object.__setattr__(self, "images", [self.images])
 
 @dataclass(frozen=True)
@@ -45,16 +43,14 @@ class DirectionsAndProducts:
     R: bool = False
 
     def __post_init__(self):
-        # ensure that directions is iterable
-        try:
-            _ = iter(self.directions)
-        except TypeError:
+        # ensure that directions is a list
+        if not isinstance(self.directions, (list, tuple)):
             object.__setattr__(self, "directions", [self.directions])
 
 @dataclass(frozen=True)
 class Station:
     """Station data"""
-    name: str
+    title: str
     id: str
     max_departures: int
 
@@ -67,7 +63,7 @@ class Station:
     stop_night: str # end of night service
 
     day: DirectionsAndProducts
-    night: DirectionsAndProducts
+    night: DirectionsAndProducts = None
 
     @property
     def is_in_night_service(self):
@@ -77,9 +73,12 @@ class Station:
         now = datetime.now()
         return time_is_between(start, now, stop)
 
-    def get_urls(self) -> Generator[str, None, None]:
+    def get_urls(self) -> Iterator[str]:
         """Get BVG API url for every direction"""
         dap = self.night if self.is_in_night_service else self.day
+        if dap is None:
+            return []
+
         for direction in dap.directions:
             yield ( f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
                     f"direction={direction}&"
@@ -167,13 +166,14 @@ class Departure:
 def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str):
     """Check if time is between start and stop (considers midnight clock wrap)
 
-    the 6 possible cases:
-    time_is_between("6:00:00", "10:00:00", "18:00:00") # True
-    time_is_between("6:00:00", "02:00:00", "18:00:00") # False
-    time_is_between("6:00:00", "20:00:00", "18:00:00") # False
+    the 7 possible cases:
+    time_is_between("06:00:00", "10:00:00", "18:00:00") # True
+    time_is_between("06:00:00", "02:00:00", "18:00:00") # False
+    time_is_between("06:00:00", "20:00:00", "18:00:00") # False
     time_is_between("18:00:00", "10:00:00", "6:00:00") # False
     time_is_between("18:00:00", "02:00:00", "6:00:00") # True
     time_is_between("18:00:00", "20:00:00", "6:00:00") # True
+    time_is_between("10:00:00", Any, "10:00:00") # ValueError
     """
     if isinstance(start, str):
         start = dateparser.parse(start)
@@ -181,6 +181,9 @@ def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str)
         time = dateparser.parse(time)
     if isinstance(stop, str):
         stop = dateparser.parse(stop)
+
+    if start == stop:
+        raise ValueError(f"Cannot resolve ambiguous time span {start}->{stop}")
 
     A = start < stop
     B = start < time
@@ -192,3 +195,12 @@ def time_left(timestr: Union[str, None]) -> int:
     dep = dateparser.parse(timestr)
     time = dep - datetime.now(dep.tzinfo)
     return time.total_seconds() / 60
+
+if __name__ == "__main__":
+    print(time_is_between("06:00:00", "10:00:00", "18:00:00")) # True
+    print(time_is_between("06:00:00", "02:00:00", "18:00:00")) # False
+    print(time_is_between("06:00:00", "20:00:00", "18:00:00")) # False
+    print(time_is_between("18:00:00", "10:00:00", "6:00:00")) # False
+    print(time_is_between("18:00:00", "02:00:00", "6:00:00")) # True
+    print(time_is_between("18:00:00", "20:00:00", "6:00:00")) # True
+    print(time_is_between("10:00:00", "11:00:00", "10:00:00")) # True
