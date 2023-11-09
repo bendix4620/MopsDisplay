@@ -1,11 +1,10 @@
 """Fetch departures of stations from BVG API"""
 
 from __future__ import annotations
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
-from functools import wraps
-from typing import Generator, Iterator, Union
+import heapq
+from typing import Iterator, Union
 from dateutil import parser as dateparser
 from PIL.ImageTk import PhotoImage
 import requests
@@ -33,6 +32,7 @@ class Poster:
 
 @dataclass(frozen=True)
 class DirectionsAndProducts:
+    """Directions and products to fetch from BVG API, used in Station"""
     directions: list[str]
     S: bool = False
     U: bool = False
@@ -98,20 +98,62 @@ class Station:
 
         departures = []
         for url in self.get_urls():
-            response = session.get(url, timeout=30_000)
-            
-            try:
-                data = response.json()
-            except requests.exceptions.JSONDecodeError:
-                data = {"departures": []}
-
-            for departure_data in data.get("departures", []):
-                departure = self._create_departure(departure_data)
+            for departure_data in self._fetch_raw_departure_data(url):
+                try:
+                    departure = self._create_departure(departure_data)
+                except Exception as e:
+                    print(departure_data)
+                    raise e
                 if departure is None:
                     continue
                 departures.append(departure)
+        # do not use heapq.merge(), because it uses __eq__ (reserved for
+        # Departure id comparison). sort() supposedly competes in speed by
+        # detection of order trends: https://stackoverflow.com/a/38340755
+        # TODO: do not sort more than the first self.max_departures elements
+        departures = list(dict.fromkeys(departures)) # duplicate filter
         departures.sort()
         return departures
+
+    def _fetch_raw_departure_data(self, url: str):
+        response = session.get(url, timeout=30_000)
+        try:
+            data = response.json()
+        except requests.exceptions.JSONDecodeError:
+            data = {"departures": []}
+        return data.get("departures", [])
+
+    def fetch_departures_heaped(self):
+        """Fetch departures from BVG API, but use different sorting"""
+        departure_iterators = []
+        for url in self.get_urls():
+            departure_iterators.append(self._get_departure_iterator(url))
+        merged = heapq.merge(*departure_iterators)
+        return self._filter_following_duplicates(merged)
+
+    def _filter_following_duplicates(self, it: Iterator[Departure]):
+        try:
+            a = next(it)
+            while True:
+                b = next(it)
+                while a == b:
+                    b = next(it)
+                yield a
+                a = b
+        except StopIteration:
+            return
+
+    def _get_departure_iterator(self, url: str) -> Iterator[Departure]:
+
+        for departure_data in data.get("departures", []):
+            try:
+                departure = self._create_departure(departure_data)
+            except Exception as e:
+                print(departure_data)
+                raise e
+            if departure is None:
+                continue
+            yield departure
 
     def _create_departure(self, data: dict) -> Union[Departure, None]:
         """Departure factory"""
@@ -132,10 +174,9 @@ class Station:
             direction=data["direction"],
             time_left=time,
             delay=data["delay"],
-            product=data["product"],
+            product=line["product"],
             reachable=reachable)
         return departure
-
 
 @dataclass(frozen=True)
 class Departure:
@@ -148,6 +189,7 @@ class Departure:
     product: str # suburban, subway, tram, bus, ferry, express, regional
     reachable: bool
 
+    # sorting
     def __lt__(self, other: Departure):
         return self.time_left < other.time_left
 
@@ -160,10 +202,13 @@ class Departure:
     def __ge__(self, other: Departure):
         return self.time_left >= other.time_left
 
+    # id comparison
     def __eq__(self, other: Departure) -> bool:
         return self.id == other.id
 
-def time_is_between(start: datetime|str, time: datetime|str, stop: datetime|str):
+def time_is_between(start: Union[datetime, str], 
+                    time: Union[datetime, str], 
+                    stop: Union[datetime, str]):
     """Check if time is between start and stop (considers midnight clock wrap)
 
     the 7 possible cases:

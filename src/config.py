@@ -1,12 +1,18 @@
-"""Import data from config.kdl"""
+"""Import data objects from config.kdl"""
 
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import List, Tuple
 from PIL.ImageTk import PhotoImage
 import kdl
 from . import defines as d
 from .data import Station, DirectionsAndProducts, Event, Poster
 
+def strip(x):
+    """Strip tuple/list if there is only one element"""
+    if isinstance(x, (tuple, list)):
+        if len(x) == 1:
+            return x[0]
+    return x
 
 def kdl2poster(string: kdl.String, raw: kdl.ParseFragment) -> PhotoImage: # pylint: disable=unused-argument
     """Convert kdl string to an image path"""
@@ -18,35 +24,23 @@ def kdl2poster(string: kdl.String, raw: kdl.ParseFragment) -> PhotoImage: # pyli
     return d.load_image(path, d.WIDTH_POSTER, d.HEIGHT_POSTER)
 
 def reduce_node(node: kdl.Node, raw: kdl.ParseFragment) -> kdl.Node: # pylint: disable=unused-argument
-    """Move child nodes to node args"""
-    node.args = node.nodes
-    node.nodes = []
-    return node
+    """Reduce a list of nodes to one node"""
+    args = node.args
+    nodes = []
+    for child_node in node.nodes:
+        args.append(strip(child_node.args))
+        nodes += child_node.nodes
+    return kdl.Node(name=node.name, args=args, nodes=nodes)
 
 class NodeConverter:
     """Convert kdl nodes to dataclass instances"""
-    def __init__(self, cls: type, strip: bool=True):
-        self._cls = cls
-        self._strip = strip
-
-    def node2args(self, node: kdl.Node) -> Tuple[list, dict]:
-        """Convert node to *args and **kwargs"""
-        print(repr(node))
-        print()
-        args = node.args
-        kwargs = {child_node.name: self.strip(child_node.args)
-                  for child_node in node.nodes}
-        return args, kwargs
-
-    def strip(self, lst: list) -> Union[list, Any]:
-        """Strip list if it only has one element"""
-        if self._strip and len(lst) == 1:
-            return lst[0]
-        return lst
+    def __init__(self, cls):
+        self.cls = cls
 
     def __call__(self, node: kdl.Node, raw: kdl.ParseFragment):
-        args, kwargs = self.node2args(node)
-        return kdl.Node(name=node.name, args=[self._cls(*args, **kwargs)])
+        args = node.args
+        kwargs = {node.name: strip(node.args) for node in node.nodes}
+        return kdl.Node(node.name, args=[self.cls(*args, **kwargs)])
 
 def load_config(path: Path):
     """Create list of Stations from station.kdl config"""

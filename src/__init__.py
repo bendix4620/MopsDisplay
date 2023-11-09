@@ -1,4 +1,4 @@
-
+"""App source package"""
 __all__ = ["root"]
 
 from tkinter import Tk

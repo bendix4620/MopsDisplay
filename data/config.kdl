@@ -32,7 +32,7 @@ posters {
     }
     */
     poster {
-        images (poster)"ringbahn0.jpg" (poster)"awarenessDE.png"
+        images (poster)"ringbahn0.jpg"
     }
 }
 
@@ -42,7 +42,7 @@ stations {
         column { /* north */
             title "S Adlershof"
             id "900193002"
-            max_departures (u8)5
+            max_departures (u8)10
 
             /* time given in minutes */
             min_time 8 /* min time left for fetched departures */
@@ -77,7 +77,7 @@ stations {
         column { /* south */
             title ""
             id "900193002"
-            max_departures (u8)5
+            max_departures (u8)10
 
             /* time given in minutes */
             min_time 8 /* min time left for fetched departures */
