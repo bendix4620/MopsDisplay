@@ -1,9 +1,11 @@
 """Import data objects from config.kdl"""
 
 from pathlib import Path
-from typing import List, Tuple
-from PIL.ImageTk import PhotoImage
+from typing import List, Tuple, Type
+
 import kdl
+from PIL.ImageTk import PhotoImage
+
 from . import defines as d
 from .data import Station, DirectionsAndProducts, Event, Poster
 
@@ -15,7 +17,7 @@ def strip(x):
     return x
 
 def kdl2poster(string: kdl.String, raw: kdl.ParseFragment) -> PhotoImage: # pylint: disable=unused-argument
-    """Convert kdl string to an image path"""
+    """Convert kdl string to an image path relative to defines.POSTER_PATH"""
     path = d.POSTER_PATH / string.value
     path = path.resolve()
 
@@ -32,15 +34,18 @@ def reduce_node(node: kdl.Node, raw: kdl.ParseFragment) -> kdl.Node: # pylint: d
         nodes += child_node.nodes
     return kdl.Node(name=node.name, args=args, nodes=nodes)
 
+
 class NodeConverter:
     """Convert kdl nodes to dataclass instances"""
-    def __init__(self, cls):
+
+    def __init__(self, cls: Type):
         self.cls = cls
 
     def __call__(self, node: kdl.Node, raw: kdl.ParseFragment):
         args = node.args
         kwargs = {node.name: strip(node.args) for node in node.nodes}
         return kdl.Node(node.name, args=[self.cls(*args, **kwargs)])
+
 
 def load_config(path: Path):
     """Create list of Stations from station.kdl config"""
@@ -61,7 +66,17 @@ def load_config(path: Path):
     return doc
 
 def load_data() -> Tuple[List[List[Station]], List[Event], List[Poster]]:
-    """Load stations, events and posters from kdl config"""
+    """Load stations, events and posters from kdl config
+    
+    Returns
+    -------
+    stations: list[list[Station]]
+        Nested list of list of Station instances
+    events: list[Events]
+        List of Event instances
+    posters: list[Poster]
+        List of Poster instances
+    """
     doc = load_config(d.CONFIG_PATH)
 
     stations = doc.get("stations")

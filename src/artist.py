@@ -5,10 +5,10 @@ from itertools import cycle
 from math import floor
 from tkinter import Canvas
 from tkinter.font import Font
-from typing import Union
+from typing import Any, List, Tuple, Union
 
-from . import defines as d  # pylint: disable=wildcard-import,unused-wildcard-import
-from . import debug # pylint: disable=wildcard-import,unused-wildcard-import
+from . import defines as d
+from . import debug
 from .config import Event, Poster
 from .data import Departure
 
@@ -29,52 +29,56 @@ def textwidth(text: str, font: Font):
     """Get width of a string in a font"""
     return font.measure(text)
 
+# transform x coordinates from a corner to the center
 corner2center_x = {
-    "nw": lambda x, w: x+w/2,
-    "ne": lambda x, w: x-w/2,
-    "se": lambda x, w: x-w/2,
-    "sw": lambda x, w: x+w/2,
-    "n":  lambda x, w: x,
-    "e":  lambda x, w: x-w/2,
-    "s":  lambda x, w: x,
-    "w":  lambda x, w: x+w/2,
-    "center": lambda x, w: x,
+    "nw": lambda x, width: x+width/2,
+    "ne": lambda x, width: x-width/2,
+    "se": lambda x, width: x-width/2,
+    "sw": lambda x, width: x+width/2,
+    "n":  lambda x, width: x,
+    "e":  lambda x, width: x-width/2,
+    "s":  lambda x, width: x,
+    "w":  lambda x, width: x+width/2,
+    "center": lambda x, width: x,
 }
 
+# transform x coordinates from the center to a corner
 center2corner_x = {
-    "nw": lambda x, w: x-w/2,
-    "ne": lambda x, w: x+w/2,
-    "se": lambda x, w: x+w/2,
-    "sw": lambda x, w: x-w/2,
-    "n":  lambda x, w: x,
-    "e":  lambda x, w: x+w/2,
-    "s":  lambda x, w: x,
-    "w":  lambda x, w: x-w/2,
-    "center": lambda x, w: x
+    "nw": lambda x, width: x-width/2,
+    "ne": lambda x, width: x+width/2,
+    "se": lambda x, width: x+width/2,
+    "sw": lambda x, width: x-width/2,
+    "n":  lambda x, width: x,
+    "e":  lambda x, width: x+width/2,
+    "s":  lambda x, width: x,
+    "w":  lambda x, width: x-width/2,
+    "center": lambda x, width: x
 }
 
+# transform y coordinates from a corner to the center
 corner2center_y = {
-    "nw": lambda y, h: y+h/2,
-    "ne": lambda y, h: y+h/2,
-    "se": lambda y, h: y-h/2,
-    "sw": lambda y, h: y-h/2,
-    "n":  lambda y, h: y+h/2,
-    "e":  lambda y, h: y,
-    "s":  lambda y, h: y-h/2,
-    "w":  lambda y, h: y,
-    "center": lambda y, h: y
+    "nw": lambda y, height: y+height/2,
+    "ne": lambda y, height: y+height/2,
+    "se": lambda y, height: y-height/2,
+    "sw": lambda y, height: y-height/2,
+    "n":  lambda y, height: y+height/2,
+    "e":  lambda y, height: y,
+    "s":  lambda y, height: y-height/2,
+    "w":  lambda y, height: y,
+    "center": lambda y, height: y
 }
 
+# transform y coordinates from the center to a corner
 center2corner_y = {
-    "nw": lambda y, h: y-h/2,
-    "ne": lambda y, h: y-h/2,
-    "se": lambda y, h: y+h/2,
-    "sw": lambda y, h: y+h/2,
-    "n":  lambda y, h: y-h/2,
-    "e":  lambda y, h: y,
-    "s":  lambda y, h: y+h/2,
-    "w":  lambda y, h: y,
-    "center": lambda y, h: y
+    "nw": lambda y, height: y-height/2,
+    "ne": lambda y, height: y-height/2,
+    "se": lambda y, height: y+height/2,
+    "sw": lambda y, height: y+height/2,
+    "n":  lambda y, height: y-height/2,
+    "e":  lambda y, height: y,
+    "s":  lambda y, height: y+height/2,
+    "w":  lambda y, height: y,
+    "center": lambda y, height: y
 }
 
 def _validate_corner(corner: Union[str, None]) -> str:
@@ -89,6 +93,18 @@ class Cell:
     """Cell with static size"""
 
     def __init__(self, x: int, y: int, width: int, height: int, anchor: str=None):
+        """Cell constructor
+        
+        Parameters
+        ----------
+        x, y: int
+            Anchor coordinates
+        width, height: int
+            Dimensions of cell
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         self._x = int(x)
         self._y = int(y)
         self._width = int(width)
@@ -103,7 +119,14 @@ class Cell:
         return True
 
     def get_x(self, corner: Union[str, None]) -> int:
-        """Get x coordinate of a corner"""
+        """Get x coordinate of a corner
+        
+        Parameters
+        ----------
+        corner: str
+            Which corner to get the coordinate from. None means cell's anchor.
+            See anchor for possible values
+        """
         corner = _validate_corner(corner)
         x = self.x
         if self._corners_differ(corner):
@@ -112,7 +135,16 @@ class Cell:
         return x
 
     def set_x(self, x: int, corner: Union[str, None]):
-        """Move x coordinate of a corner to the given value"""
+        """Set x coordinate of a corner to the given value
+        
+        Parameters
+        ----------
+        x: int
+            x coordinate to place the corner at
+        corner: str
+            Which corner to get the coordinate from. None means cell's anchor.
+            See anchor for possible values
+        """
         corner = _validate_corner(corner)
         self.x += x - self.get_x(corner)
 
@@ -126,7 +158,14 @@ class Cell:
         self._x = int(x)
 
     def get_y(self, corner: Union[str, None]) -> int:
-        """Get y coordinate of a corner"""
+        """Get y coordinate of a corner
+        
+        Parameters
+        ----------
+        corner: str
+            Which corner to get the coordinate from. None means cell's anchor.
+            See anchor for possible values
+        """
         corner = _validate_corner(corner)
         y = self.y
         if self._corners_differ(corner):
@@ -135,7 +174,16 @@ class Cell:
         return y
 
     def set_y(self, y: int, corner: Union[str, None]):
-        """Move y coordinate of a corner to the given value"""
+        """Set y coordinate of a corner to the given value
+        
+        Parameters
+        ----------
+        y: int
+            y coordinate to place the corner at
+        corner: str
+            Which corner to get the coordinate from. None means cell's anchor.
+            See anchor for possible values
+        """
         corner = _validate_corner(corner)
         self.y += y - self.get_y(corner)
 
@@ -150,31 +198,45 @@ class Cell:
 
     @property
     def width(self) -> int:
-        """Artist width"""
+        """Cell width"""
         return self._width
 
     @property
     def height(self) -> int:
-        """Artist height"""
+        """Cell height"""
         return self._height
 
     @property
     def anchor(self) -> str:
-        """Artist anchor
+        """Cell anchor
         Possible values: "nw", "n", "ne", "e", "se", "s", "sw", "w", "center"
         """
         return self._anchor
 
     @property
-    def bbox(self) -> tuple[int, int, int, int]:
-        """Artist bounding box (x0, y0, x1, y1)"""
+    def bbox(self) -> Tuple[int, int, int, int]:
+        """Artist bounding box (xmin, ymin, xmax, ymax)"""
         return self.get_x("nw"), self.get_y("nw"), self.get_x("se"), self.get_y("se")
 
 
 class Artist(Cell):
-    """Artist that draws on a canvas"""
+    """Artist that draws on a tkinter canvas"""
 
     def __init__(self, canvas: Canvas, x: int, y: int, width: int, height: int, anchor: str=None):
+        """Artist constructor
+        
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        x, y: int
+            Anchor coordinates
+        width, height: int
+            Dimensions of cell
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         super().__init__(x, y, width, height, anchor=anchor)
 
         self.canvas = canvas
@@ -185,7 +247,17 @@ class Artist(Cell):
         """Perform position update"""
 
     def draw_debug_outlines(self, depth: int=0):
-        """Draw outlines and anchor position"""
+        """Draw debug outlines around the artist
+
+        Debug outlines consists of a rectangle around the bounding box and a
+        circle at the anchor coordinate
+
+        Parameters
+        ----------
+        depth: int
+            How deep the artist is nested within other artists.
+            Determines the outline color
+        """
         # print(f"Drawing {type(self).__name__: <15} at x={self.x:<4} y={self.y:<4} w={self.width:<4} h={self.height:<4} a={self.anchor:<4} bbox={self.bbox}")
 
         color = debug.COLORS[depth]
@@ -195,18 +267,40 @@ class Artist(Cell):
 
 
 class StackArtist(Artist):
-    """Vertical stack of artists, has constant size"""
+    """Vertical stack of artists that move as a union
+    Width and height is defines by the artists in the stack
+    """
 
-    def __init__(self, canvas: Canvas, x: int, y: int, anchor=None, flush=None, artists: list[Artist]=None):
+    def __init__(self, canvas: Canvas, x: int, y: int, anchor: str=None, flush: str=None, artists: List[Artist]=None):
+        """StackArtist constructor
+        
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        x, y: int
+            Anchor coordinates
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        flush: str, optional
+            Specify which direction to flush artists inside the stack if they 
+            have different sizes. Defaults to None (center). See anchor for 
+            possible values
+        artists: list[Artist]
+            Artists to stack onto each other
+        """
         self.flush = _validate_corner(flush)
-        self._artists: list[Artist] = [] if artists is None else artists
+        self._artists: List[Artist] = [] if artists is None else artists
 
         height = sum(a.height for a in self._artists)
         width = max(a.width for a in self._artists) if len(self._artists) > 0 else 0
         super().__init__(canvas, x, y, width, height, anchor=anchor)
 
     def update_position(self):
-        """Perform position update"""
+        """Perform position update
+        Move all artists in the stack accordingly
+        """
         x = self.get_x(self.flush)
         y = self.get_y("nw")
         for artist in self._artists:
@@ -217,17 +311,36 @@ class StackArtist(Artist):
         return super().update_position()
 
     def draw_debug_outlines(self, depth: int=0):
-        """Draw a rectangle around the child bounding boxes and a circle at the anchor"""
+        """Draw debug outlines of the StackArtists and all held artists
+        See Artist.draw_debug_outlines for detail
+        """
         for artist in self._artists:
             artist.draw_debug_outlines(depth=depth+1)
         return super().draw_debug_outlines(depth)
 
 
 class DepartureArtist(Artist):
-    """Display a departure on a canvas"""
+    """Displays departure information on a canvas
+    Includes a line icon, the destination and the time remaining until
+    departure
+    """
     WIDTH_SPACE = textwidth(" ", d.FONT_DEPARTURE)
 
     def __init__(self, canvas: Canvas, anchor: str=None):
+        """DepartureArtist constructor
+        
+        Will be constructed at (0, 0).
+        Size is determined by defines.WIDTH_ICON, defines.WIDTH_DIRECTION,
+        defines.WIDTH_TIME and defines.FONT_DEPARTURE
+        
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         # create artist
         width = d.WIDTH_ICON + d.WIDTH_DIRECTION + d.WIDTH_TIME + 2*self.WIDTH_SPACE
         height = lineheight(d.FONT_DEPARTURE)
@@ -253,7 +366,13 @@ class DepartureArtist(Artist):
         return super().update_position()
 
     def update_departure(self, departure: Union[Departure, None]):
-        """Update departure information"""
+        """Update displayed departure information
+        
+        Parameters
+        ----------
+        departure: Departure|None
+            The departure information to display. None displays an error
+        """
         tripid = getattr(departure, "id", None)
 
         if tripid != self.last_tripid:
@@ -263,14 +382,20 @@ class DepartureArtist(Artist):
         self.configure_time(departure)
 
     def clear_departure(self):
-        """Clear departure display"""
+        """Display an error"""
         self.last_tripid = None
         self.configure_icon(None)
         self.configure_drct(None)
         self.configure_time(None)
 
     def configure_icon(self, departure: Union[Departure, None]):
-        """Change the displayed icon"""
+        """Change the displayed icon
+
+        Parameters
+        ----------
+        departure: Departure|None
+            The departure information. None displays nothing
+        """
         # no deaprture found
         if departure is None:
             self.canvas.itemconfigure(self.id_icon, image=d.ICONS.get("empty"))
@@ -280,16 +405,22 @@ class DepartureArtist(Artist):
         icon = d.ICONS.get(departure.line, None)
         if icon is None:
             icon = d.ICONS.get(departure.product, None)
-            print(f"Warning: Fallback images used for {departure.line}")
+            print(f"Warning: Fallback icon used for {departure.line}")
         if icon is None:
             icon = d.ICONS.get("default")
-            print(f"Warning: Default images used for {departure.line}")
+            print(f"Warning: Default icon used for {departure.line}")
 
         # configure
         self.canvas.itemconfigure(self.id_icon, image=icon)
 
     def configure_drct(self, departure: Union[Departure, None]):
-        """Change the displayed direction"""
+        """Change the displayed direction/destination
+        
+        Parameters
+        ----------
+        departure: Departure|None
+            The departure information. None displays an error
+        """
         # no departure found
         string = getattr(departure, "direction", None)
         if not isinstance(string, str):
@@ -306,10 +437,11 @@ class DepartureArtist(Artist):
         occupied = textwidth(string, d.FONT_DEPARTURE)
 
         if occupied < available:
+            # display string fits, fill remainder with dots
             count = (available-occupied) // width_dot
             dots = "." * count if count > 1 else ""
         else:
-            # print(f"Warning: direction name too long! {string}")
+            # display string does not fit, cut off after last fitting char
             idx = len(string)
             occupied = width_dot
             for i, char in enumerate(string):
@@ -326,7 +458,13 @@ class DepartureArtist(Artist):
         self.canvas.itemconfigure(self.id_dots, text=dots)
 
     def configure_time(self, departure: Union[Departure, None]) -> str:
-        """configure time left"""
+        """Change displayed remaining time
+
+        Parameters
+        ----------
+        departure: Departure|None
+            The departure information. None displays nothing
+        """
         # no departure found
         if departure is None:
             self.canvas.itemconfigure(self.id_time, text=" ")
@@ -338,9 +476,28 @@ class DepartureArtist(Artist):
 
 
 class TitleArtist(Artist):
-    """Display a title"""
+    """Displays a title on a canvas
+    Has 1px width so it can be used without disturbing grid placement
+    """
 
     def __init__(self, canvas: Canvas, text: str, font: Font=d.FONT_TITLE, anchor=None):
+        """TitleArtist constructor
+
+        Will be constructed at (0, 0)
+        Width is 1px, height is determined by font
+
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        text: str
+            Text to display
+        font: tkinter.Font, optional
+            Font to use. Defaults to defines.FONT_TITLE
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         height = textheight(text, font)
         super().__init__(canvas, 0, 0, 1, height, anchor=anchor)
 
@@ -352,10 +509,28 @@ class TitleArtist(Artist):
 
 
 class EventArtist(Artist):
-    """Display event information"""
+    """Display event information
+    Includes a date and a description
+    """
     WIDTH_SPACE = textwidth(" ", d.FONT_EVENT)
 
     def __init__(self, canvas: Canvas, event: Event, anchor=None):
+        """EventArtist constructor
+
+        Will be constructed at (0, 0)
+        Size is determined defines.WIDTH_DATE, defines.FONT_EVENT and the 
+        string event.desc
+
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        event: Event
+            The event to display
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         width = d.WIDTH_DATE + self.WIDTH_SPACE + textwidth(event.desc, d.FONT_EVENT)
         height = max(textheight(event.date, d.FONT_EVENT), textheight(event.desc, d.FONT_EVENT))
         super().__init__(canvas, 0, 0, width, height, anchor=anchor)
@@ -372,9 +547,24 @@ class EventArtist(Artist):
 
 
 class PosterArtist(Artist):
-    """Display cycling posters"""
+    """Displays cycling posters"""
 
     def __init__(self, canvas: Canvas, poster: Poster, anchor=None):
+        """PosterArtist constructor
+        
+        Will be constructed at (0, 0)
+        Size is determined by the largest poster.
+
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        poster: Poster
+            Poster to display
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         width = max(img.width() for img in poster.images)
         height = max(img.height() for img in poster.images)
         super().__init__(canvas, 0, 0, width, height, anchor=anchor)
@@ -393,9 +583,22 @@ class PosterArtist(Artist):
 
 
 class ClockArtist(Artist):
-    """Digital time display"""
+    """Displays a digital clock in the format HH:MM"""
 
     def __init__(self, canvas: Canvas, anchor=None):
+        """ClockArtist constructor
+        
+        Will be constructed at (0, 0)
+        Size is determined by defines.FONT_CLOCK
+
+        Parameters
+        ----------
+        canvas: tkinter.Canvas
+            Canvas to draw on
+        anchor: str, optional
+            Specify which point in the cell the coordinates (x, y) describe.
+            Defaults to None (center). See anchor for possible values
+        """
         height = lineheight(d.FONT_CLOCK)
         width = textwidth("00:00", d.FONT_CLOCK)
         super().__init__(canvas, 0, 0, width, height, anchor=anchor)
@@ -408,15 +611,30 @@ class ClockArtist(Artist):
         return super().update_position()
 
     def update_clock(self):
-        """update to current time"""
+        """Update clock to current time"""
         timestr = datetime.now().strftime("%H:%M")
         self.canvas.itemconfigure(self.id_time, text=timestr)
 
 
 class GridCanvas(Canvas):
-    """Canvas that evenly aligns artists in a grid"""
+    """Canvas that evenly aligns artists in a grid
+    Automatically re-aligns artists if the canvas size changes
+    """
 
     def __init__(self, master, flush: str=None, **options):
+        """GridCanvas constructor
+
+        Parameters
+        ----------
+        master: tkinter.Frame
+            tkinter frame to create canvas on
+        flush: str, optional
+            Specify which direction to flush artists inside the grid if they 
+            have different sizes. Defaults to None (center). See Artist.anchor 
+            for possible values
+        **options
+            Keyword arguments passed to tkinter.Canvas.__init__()
+        """
         super().__init__(master, **options)
         self.bind("<Configure>", self.on_resize)
 
@@ -424,19 +642,63 @@ class GridCanvas(Canvas):
         self.artists: dict[tuple[int, int], Artist] = {}
 
     def set(self, row: int, col: int, artist: Artist):
-        """Set artist to position"""
+        """Set artist to grid position (row, col)
+        
+        Parameters
+        ----------
+        row: int
+            Row to place artist in
+        col: int
+            Column to place artist in
+        artist: Artist
+            Artist to place at (row, col)
+        """
         self.artists[row, col] = artist
 
-    def get(self, row: int, col: int, *default) -> Artist:
-        """Get artist at position"""
+    def get(self, row: int, col: int, *default) -> Union[Artist, Any]:
+        """Get artist at grid position (row, col)
+        
+        Parameters
+        ----------
+        row: int
+            Row to get artist from
+        col: int
+            Column to get artist from
+        *default:
+            Optional default value if (row, col) has no artist
+        
+        Return
+        ------
+        Artist|Any
+            The artist at grid position (row, col) or passed default value if 
+            grid position is empty
+        """
         return self.artists.get((row, col), *default)
 
-    def pop(self, row: int, col: int, *default) -> Artist:
-        """Pop artist from position"""
+    def pop(self, row: int, col: int, *default) -> Union[Artist, Any]:
+        """Pop artist at grid position (row, col)
+        
+        Parameters
+        ----------
+        row: int
+            Row to pop artist from
+        col: int
+            Column to pop artist from
+        *default:
+            Optional default value if (row, col) has no artist
+        
+        Return
+        ------
+        Artist|Any
+            The artist at grid position (row, col) or passed default value if 
+            grid position is empty
+        """
         return self.artists.pop((row, col), *default)
 
     def query_size(self):
-        """Get row and column sizes (widths, heights)"""
+        """Get minimal row and column sizes (widths, heights) required to place
+        the artists in the grid
+        """
         widths = []
         heights = []
         for (row, col), artist in self.artists.items():
@@ -449,23 +711,29 @@ class GridCanvas(Canvas):
         return widths, heights
 
     def on_resize(self, event):
-        """Canvas resize event callback, venly space artists"""
-        self.delete("debug_outlines") # delete debug outlines, since they will be redrawn
+        """Canvas resize event callback, evenly space artists"""
+        # delete debug outlines, since they will potentially be re-drawn
+        self.delete("debug_outlines") 
 
+        # calculate size and available padding for evenly spacing artists
         widths, heights = self.query_size()
         padx = (event.width  - sum(widths) ) / (1 + len(widths) )
         pady = (event.height - sum(heights)) / (1 + len(heights))
 
+        # evenly place artists
         y = pady
         for row, height in enumerate(heights):
             x = padx
             for col, width in enumerate(widths):
+                # place artist if there is one
                 artist = self.artists.get((row, col), None)
                 if artist is not None:
                     cell = Artist(self, x, y, width, height, anchor="nw")
                     artist.set_x(cell.get_x(self.flush), self.flush)
                     artist.set_y(cell.get_y(self.flush), self.flush)
                     artist.update_position()
+                    
+                    # draw debug outlines
                     if debug.DEBUG:
                         cell.draw_debug_outlines(depth=0)
                         artist.draw_debug_outlines(depth=1)

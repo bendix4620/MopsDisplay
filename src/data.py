@@ -107,6 +107,8 @@ class Station:
                 if departure is None:
                     continue
                 departures.append(departure)
+                if departure.line == "m17":
+                    print(departure_data)
         # do not use heapq.merge(), because it uses __eq__ (reserved for
         # Departure id comparison). sort() supposedly competes in speed by
         # detection of order trends: https://stackoverflow.com/a/38340755
@@ -205,6 +207,9 @@ class Departure:
     # id comparison
     def __eq__(self, other: Departure) -> bool:
         return self.id == other.id
+    
+    def __hash__(self) -> int:
+        return hash(self.id)
 
 def time_is_between(start: Union[datetime, str], 
                     time: Union[datetime, str], 

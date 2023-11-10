@@ -50,8 +50,8 @@ stations {
             time_needed 11 /* min time needed to reach station */
 
             /* time given in HH:MM:SS */
-            start_night "23:59:00" /* start of night service */
-            stop_night  "05:00:00" /* stop of night service */
+            start_night "23:59:00" /* start of night time */
+            stop_night  "05:00:00" /* stop of night time */
 
             day { /* fetch during day time */
                 directions "900193001"
