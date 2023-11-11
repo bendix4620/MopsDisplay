@@ -1,8 +1,7 @@
 """
-Displays realtime train departures for nearby stations, and upcoming events from the HU calendar.
+MopsDisplay 2.0
 
-Authored-By: Maris Baier
-Co-Authored-By: Hazel Reimer
+Display realtime train departures for nearby stations and upcoming events from the HU calendar.
 """
 
 from itertools import zip_longest
