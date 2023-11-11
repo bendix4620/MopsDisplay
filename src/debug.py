@@ -5,7 +5,7 @@ import time
 from typing import Callable
 
 
-DEBUG = True
+DEBUG = False
 BENCHMARK = False
 
 

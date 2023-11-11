@@ -82,9 +82,7 @@ def create_station_artist(
         for _ in range(station.max_departures)
     ]
     stack = StackArtist(
-        canvas,
-        0,
-        0,
+        canvas, 0, 0,
         anchor="w",
         flush="w",
         artists=[title_artist] + departure_artists,
@@ -94,16 +92,14 @@ def create_station_artist(
     return station, departure_artists
 
 
-def main(root):
+def main():
     """main"""
     # define root geometry
     # --------------------
-    root.geometry(f"{d.WIDTH_ROOT}x{d.HEIGHT_ROOT}")
     root.rowconfigure(0, weight=0)
     root.rowconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)
     root.columnconfigure(1, weight=1)
-    root.attributes("-fullscreen", True)
 
     # load data from config
     # ---------------------
@@ -151,23 +147,24 @@ def main(root):
         event_artist = EventArtist(event_canvas, event)
         EVENT_ARTISTS.append(event_artist)
     title_artist = TitleArtist(
-        event_canvas, "nächste Veranstaltungen:\n",
+        event_canvas, "nächste Veranstaltungen:",
         font=d.FONT_EVENT,
-        anchor="w",
     )
+    event_canvas.set(1, 0, title_artist)
+
     stack = StackArtist(
         event_canvas, 0, 0,
         anchor="center",
         flush="w",
-        artists=[title_artist] + EVENT_ARTISTS,
+        artists=EVENT_ARTISTS,
     )
-    event_canvas.set(1, 0, stack)
+    event_canvas.set(2, 0, stack)
 
     # create posters
     # --------------
     for row, poster in enumerate(posters):
         artist = PosterArtist(event_canvas, poster)
-        event_canvas.set(2 + row, 0, artist)
+        event_canvas.set(3 + row, 0, artist)
         POSTER_ARTISTS.append(artist)
 
     root.after(0, update_stations)
@@ -177,4 +174,6 @@ def main(root):
 
 
 if __name__ == "__main__":
-    main(root)
+    root.geometry(f"{d.WIDTH_ROOT}x{d.HEIGHT_ROOT}")
+    # root.attributes("-fullscreen", True)
+    main()

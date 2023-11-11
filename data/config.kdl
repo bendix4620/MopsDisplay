@@ -6,20 +6,12 @@ events {
     } 
     */
     event {
-        date "26.10."
-        desc "Hörsaalkino: Wall-E"
-    }
-    event {
-        date "31.10."
-        desc "Hörsaalkino: Evil Dead Rise"
-    }
-    event {
-        date "02.11."
-        desc "Hörsaalkino: Sunshine"
-    }
-    event {
         date "16.11."
         desc "Doppelkopfturnier"
+    }
+    event {
+        date "24.11."
+        desc "Ringbahntour der Physik"
     }
 }
 
@@ -32,7 +24,7 @@ posters {
     }
     */
     poster {
-        images (poster)"ringbahn0.jpg"
+        images (poster)"ringbahn0.jpg" (poster)"doko_plakat.png"
     }
 }
 
@@ -112,9 +104,9 @@ stations {
         id "900194016"
         max_departures (u8)5
 
-        min_time 8
+        min_time 3
         max_time 90
-        time_needed 11
+        time_needed 5
 
         start_night "03:00:00"
         stop_night  "04:00:00"
@@ -134,9 +126,9 @@ stations {
         id "900194016"
         max_departures (u8)5
 
-        min_time 8
+        min_time 3
         max_time 90
-        time_needed 11
+        time_needed 5
 
         start_night "23:59:00"
         stop_night  "05:00:00"
@@ -157,7 +149,7 @@ stations {
         id "900194501"
         max_departures (u8)5
 
-        min_time 8
+        min_time 3
         max_time 90
         time_needed 5
 
@@ -183,7 +175,7 @@ stations {
         id "900194501"
         max_departures (u8)5
 
-        min_time 8
+        min_time 3
         max_time 90
         time_needed 5
 
