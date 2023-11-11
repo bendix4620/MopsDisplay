@@ -1,12 +1,13 @@
-"""Debugging tools"""
+"""Debug and benchmark tools"""
 
 from functools import wraps
 import time
 from typing import Callable
 
 
-DEBUG = False
+DEBUG = True
 BENCHMARK = False
+
 
 class CycleWithIndex:
     """Similar to itertools.cycle, but allows element access by index"""
@@ -17,9 +18,23 @@ class CycleWithIndex:
     def __getitem__(self, idx: int):
         return self.lst[idx % len(self.lst)]
 
+
 # matplotlib default color cycle
-COLORS = CycleWithIndex(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'])
+COLORS = CycleWithIndex(
+    [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+    ]
+)
+
 
 class Timed:
     """Execution time measurement class
@@ -27,14 +42,14 @@ class Timed:
     instances support with statement
     """
 
-    def __init__(self, name: str=None):
+    def __init__(self, name: str = None):
         self.name = name
         self.start = 0
 
     def __enter__(self):
         if BENCHMARK:
             self.start = time.perf_counter()
-            return self
+        return self
 
     def __exit__(self, *args):
         if BENCHMARK:
@@ -43,6 +58,7 @@ class Timed:
             print(f"Executing {name} took {passed:.6f}s")
 
     def __call__(self, func: Callable):
+        """function decorator"""
         if self.name is None:
             self.name = func.__name__
 
@@ -51,27 +67,28 @@ class Timed:
             with self:
                 res = func(*args, **kwargs)
             return res
+
         return wrapper if BENCHMARK else func
 
-class TimedCumulative:
-    """Cumulative timer"""
-    def __init__(self, name: str):
-        self.name = name
-        self.time = 0
-        self.start = 0
 
-    def __enter__(self):
-        self.start = time.perf_counter()
-        return self
+class TimedCumulative(Timed):
+    """Cumulative version of Timed"""
+
+    def __init__(self, name: str = None):
+        super().__init__(name=name)
+        self.time = 0
 
     def __exit__(self, *args):
-        passed = time.perf_counter() - self.start
-        self.time += passed
+        if BENCHMARK:
+            passed = time.perf_counter() - self.start
+            self.time += passed
 
-    def __call__(self, func: Callable):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            with self:
-                res = func(*args, **kwargs)
-            return res
-        return wrapper
+    def readout(self):
+        """Print timer"""
+        if BENCHMARK:
+            name = "unnamed code block" if self.name is None else self.name
+            print(f"Executing {name} took {self.time:.6f}s until now")
+
+    def reset(self):
+        """Reset timer to 0"""
+        self.time = 0

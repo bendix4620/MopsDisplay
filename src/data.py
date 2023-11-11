@@ -1,28 +1,46 @@
-"""Fetch departures of stations from BVG API"""
+"""Define dataclasses that are imported from the config file and manage API 
+requests to obtain departure informations"""
 
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
-import heapq
-from typing import Iterator, Union
+from typing import Iterator, List, Union
 from dateutil import parser as dateparser
 from PIL.ImageTk import PhotoImage
 import requests
+from . import debug
 
 
 session = requests.Session()
+FETCH_DEPARTURE_TIMER = debug.TimedCumulative(name="fetch departures")
 
 
 @dataclass(frozen=True)
 class Event:
-    """Event data"""
+    """Event data
+
+    Attributes
+    ----------
+    date: str
+        Date of the event
+    desc: str
+        Short desription of the event (may include newline characters)
+    """
+
     date: str
     desc: str
 
 
 @dataclass(frozen=True)
 class Poster:
-    """Poster data"""
+    """Poster data
+
+    Attributes
+    ----------
+    images: list[tkinter.PhotoImage]
+        List of tkinter.PhotoImages to cycle through
+    """
+
     images: list[PhotoImage]
 
     def __post_init__(self):
@@ -30,9 +48,32 @@ class Poster:
         if not isinstance(self.images, (list, tuple)):
             object.__setattr__(self, "images", [self.images])
 
+
 @dataclass(frozen=True)
 class DirectionsAndProducts:
-    """Directions and products to fetch from BVG API, used in Station"""
+    """Directions and products to fetch from BVG API, used in Station
+
+    Attributes
+    ----------
+    directions: list[str]
+        List of station ids. A direction of a departure is given as the station
+        id of a station it stops at after departing.
+    S: bool, optional
+        Wether to fetch suburban lines (S-Bahn). Defaults to False
+    U: bool, optional
+        Wether to fetch subway lines (U-Bahn). Defaults to False
+    T: bool, optional
+        Wether to fetch tram lines. Defaults to False
+    B: bool, optional
+        Wether to fetch bus lines. Defaults to False
+    F: bool, optional
+        Wether to fetch ferry lines. Defaults to False
+    E: bool, optional
+        Wether to fetch express lines (IC/ICE). Defaults to False
+    R: bool, optional
+        Wether to fetch regional lines (RE/RB). Defaults to False
+    """
+
     directions: list[str]
     S: bool = False
     U: bool = False
@@ -47,27 +88,60 @@ class DirectionsAndProducts:
         if not isinstance(self.directions, (list, tuple)):
             object.__setattr__(self, "directions", [self.directions])
 
+
 @dataclass(frozen=True)
 class Station:
-    """Station data"""
+    """Station data
+
+    Attributes
+    ----------
+    row: int
+        Which row in the canvas grid to position the station at
+    col: int
+        Which column in the canvas grid to position the station at
+    title: str
+        Station title to display
+    id: str
+        Station API id
+    max_departures: int
+        Number of departures to display (and fetch per direction)
+    min_time: float
+        Minimal time left (in minutes) for a departure to be fetched
+    max_time: float
+        Maximum time left (in minutes) for a departure to be fetched
+    time_needed: float
+        Approximate time needed to reach the station (in minutes)
+    start_night: str
+        Time at which departure fetching switches to the night options
+        (in 24h format "HH:MM:SS")
+    stop_night: str
+        Time at which departure fetching switches back to day options
+        (in 24h format "HH:MM:SS")
+    day: DirectionsAndProducts, optional
+        Day options for departure fetching. Defaults to None (no fetching)
+    night: DirectionsAndProducts, optional
+        Night options for departure fetching. Defaults to None (no fetching)
+    """
+
+    row: int
+    col: int
     title: str
     id: str
     max_departures: int
 
-    # times given in minutes
-    min_time: float # min time left for fetched departures
-    max_time: float # max time left for fetched departures
-    time_needed: float # time needed to reach station
+    min_time: float
+    max_time: float
+    time_needed: float
 
-    start_night: str # start of night service
-    stop_night: str # end of night service
+    start_night: str
+    stop_night: str
 
-    day: DirectionsAndProducts
+    day: DirectionsAndProducts = None
     night: DirectionsAndProducts = None
 
     @property
-    def is_in_night_service(self):
-        """Return True if night service is currently active"""
+    def is_night(self) -> bool:
+        """Return True if night options should be active"""
         start = dateparser.parse(self.start_night)
         stop = dateparser.parse(self.stop_night)
         now = datetime.now()
@@ -75,25 +149,27 @@ class Station:
 
     def get_urls(self) -> Iterator[str]:
         """Get BVG API url for every direction"""
-        dap = self.night if self.is_in_night_service else self.day
+        dap = self.night if self.is_night else self.day
         if dap is None:
             return []
 
         for direction in dap.directions:
-            yield ( f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
-                    f"direction={direction}&"
-                    f"when=in+{self.min_time}+minutes&"
-                    f"duration={self.max_time-self.min_time}&"
-                    f"results={self.max_departures}&"
-                    f"suburban={dap.S}&"
-                    f"subway={dap.U}&"
-                    f"tram={dap.T}&"
-                    f"bus={dap.B}&"
-                    f"ferry={dap.F}&"
-                    f"express={dap.E}&"
-                    f"regional={dap.R}")
+            yield (
+                f"https://v6.bvg.transport.rest/stops/{self.id}/departures?"
+                f"direction={direction}&"
+                f"when=in+{self.min_time}+minutes&"
+                f"duration={self.max_time-self.min_time}&"
+                f"results={self.max_departures}&"
+                f"suburban={dap.S}&"
+                f"subway={dap.U}&"
+                f"tram={dap.T}&"
+                f"bus={dap.B}&"
+                f"ferry={dap.F}&"
+                f"express={dap.E}&"
+                f"regional={dap.R}"
+            )
 
-    def fetch_departures(self):
+    def fetch_departures(self) -> List[Departure]:
         """Fetch departures from BVG API"""
 
         departures = []
@@ -110,11 +186,11 @@ class Station:
         # do not use heapq.merge(), because it uses __eq__ (reserved for
         # Departure id comparison). sort() supposedly competes in speed by
         # detection of order trends: https://stackoverflow.com/a/38340755
-        # TODO: do not sort more than the first self.max_departures elements
-        departures = list(dict.fromkeys(departures)) # duplicate filter
+        departures = list(dict.fromkeys(departures))  # duplicate filter
         departures.sort()
         return departures
 
+    @FETCH_DEPARTURE_TIMER
     def _fetch_raw_departure_data(self, url: str):
         response = session.get(url, timeout=30_000)
         try:
@@ -123,40 +199,8 @@ class Station:
             data = {"departures": []}
         return data.get("departures", [])
 
-    def fetch_departures_heaped(self):
-        """Fetch departures from BVG API, but use different sorting"""
-        departure_iterators = []
-        for url in self.get_urls():
-            departure_iterators.append(self._get_departure_iterator(url))
-        merged = heapq.merge(*departure_iterators)
-        return self._filter_following_duplicates(merged)
-
-    def _filter_following_duplicates(self, it: Iterator[Departure]):
-        try:
-            a = next(it)
-            while True:
-                b = next(it)
-                while a == b:
-                    b = next(it)
-                yield a
-                a = b
-        except StopIteration:
-            return
-
-    def _get_departure_iterator(self, url: str) -> Iterator[Departure]:
-
-        for departure_data in data.get("departures", []):
-            try:
-                departure = self._create_departure(departure_data)
-            except Exception as e:
-                print(departure_data)
-                raise e
-            if departure is None:
-                continue
-            yield departure
-
     def _create_departure(self, data: dict) -> Union[Departure, None]:
-        """Departure factory"""
+        """Departure factory, return None if data has an error"""
         # resolve unexpected api departure time outputs
         timestr = data["when"]
         if timestr is None:
@@ -175,18 +219,45 @@ class Station:
             time_left=time,
             delay=data["delay"],
             product=line["product"],
-            reachable=reachable)
+            reachable=reachable,
+        )
         return departure
+
 
 @dataclass(frozen=True)
 class Departure:
-    """Departure data"""
+    """Departure data
+
+    Attributes
+    ----------
+    id: str
+        API trip id
+    line: str
+        Name of the line (for example "s46")
+    direction: str
+        Direction of the trip. Not to be confused with the station ids in
+        DirectionsAndProducts.directions
+    time_left: float
+        Time left (in minutes) until departing
+    delay: float
+        Delay of the departure (in minutes)
+    product: str
+        Product of the trip, see optional arguments of DirectionsAndProducts
+    reachable: bool
+        Wether the departure is reachable by foot
+
+    Notes
+    -----
+    Departures can sort (<, <=, >, >=) according to the time_left argument
+    Departures are equal (==, hash) if their id arguments are equal
+    """
+
     id: str
     line: str
     direction: str
     time_left: float
     delay: float
-    product: str # suburban, subway, tram, bus, ferry, express, regional
+    product: str  # suburban, subway, tram, bus, ferry, express, regional
     reachable: bool
 
     # sorting
@@ -205,13 +276,16 @@ class Departure:
     # id comparison
     def __eq__(self, other: Departure) -> bool:
         return self.id == other.id
-    
+
     def __hash__(self) -> int:
         return hash(self.id)
 
-def time_is_between(start: Union[datetime, str], 
-                    time: Union[datetime, str], 
-                    stop: Union[datetime, str]):
+
+def time_is_between(
+    start: Union[datetime, str],
+    time: Union[datetime, str],
+    stop: Union[datetime, str],
+):
     """Check if time is between start and stop (considers midnight clock wrap)
 
     the 7 possible cases:
@@ -238,17 +312,9 @@ def time_is_between(start: Union[datetime, str],
     C = time < stop
     return (B and C) if A else (B or C)
 
+
 def time_left(timestr: Union[str, None]) -> int:
     """Parse string and calculate remaining time in minutes"""
     dep = dateparser.parse(timestr)
     time = dep - datetime.now(dep.tzinfo)
     return time.total_seconds() / 60
-
-if __name__ == "__main__":
-    print(time_is_between("06:00:00", "10:00:00", "18:00:00")) # True
-    print(time_is_between("06:00:00", "02:00:00", "18:00:00")) # False
-    print(time_is_between("06:00:00", "20:00:00", "18:00:00")) # False
-    print(time_is_between("18:00:00", "10:00:00", "6:00:00")) # False
-    print(time_is_between("18:00:00", "02:00:00", "6:00:00")) # True
-    print(time_is_between("18:00:00", "20:00:00", "6:00:00")) # True
-    print(time_is_between("10:00:00", "11:00:00", "10:00:00")) # True
